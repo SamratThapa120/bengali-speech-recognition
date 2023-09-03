@@ -1,0 +1,7 @@
+librosa
+pydub
+eyed3
+plotly
+cltk
+bnlp_toolkit==4.0.0
+jiwer==3.0.3
