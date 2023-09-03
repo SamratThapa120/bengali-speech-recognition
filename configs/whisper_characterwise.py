@@ -16,12 +16,12 @@ class Configs(Base):
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
     VALID_DATA_PATH="/app/dataset/valid_data.csv"
     DATA_ROOT="/app/dataset/train_mp3s"
-    USE_DATASET_LEN=None   #Set to small number while debugging
+    USE_DATASET_LEN=100   #Set to small number while debugging
     SAMPLES_PER_GPU=32
     VALIDATION_BS=32
     VALIDATION_FREQUENCY=2
     PIN_MEMORY=True
-    NUM_WORKERS=4
+    NUM_WORKERS=0
     DISTRIBUTED=False
 
     LR=0.0005

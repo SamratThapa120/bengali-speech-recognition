@@ -10,17 +10,19 @@ from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
 class Trainer:
     def __init__(self, base_obj):
         self.__dict__.update(base_obj.get_all_attributes())
-        
+
         if self.DISTRIBUTED:
             self.rank = dist.get_rank()
             self.world_size = dist.get_world_size()
-            self.model = DistributedDataParallel(self.model, device_ids=[self.device])
+            self.device = f"cuda:{self.rank}"
+            self.model = self.model.to(self.device)
+            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],)
             self.train_sampler = DistributedSampler(self.train_dataset, num_replicas=self.world_size, rank=self.rank)
         else:
             self.rank=0
             self.train_sampler = None
-
             self.model = self.model.to(self.device)
+
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
         os.makedirs(self.OUTPUTDIR,exist_ok=True)
@@ -32,12 +34,12 @@ class Trainer:
             self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
        
 
-
+    #@profile
     def train_one_epoch(self,epoch):
         self.model.train()
         total_loss = 0.0
         num_batches = 0
-        for batch in tqdm(self.train_loader,desc=f"Train epoch: {epoch}"):
+        for batch in tqdm(self.train_loader,desc=f"Train epoch: {epoch}",disable=self.rank!=0):
             # Your training code here
             inputs, inp_tokens,target_tokens = [b.to(self.device) for b in batch]
             

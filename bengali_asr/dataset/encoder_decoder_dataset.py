@@ -5,6 +5,7 @@ from subprocess import CalledProcessError, run
 import numpy as np
 from torch.nn import functional as F
 
+#@profile
 def load_audio(file: str, sr: int):
     """
     Open an audio file and read as mono waveform, resampling as necessary
@@ -62,7 +63,8 @@ class SpeechRecognitionDataset(Dataset):
         self.train=train
     def __len__(self):
         return len(self.speech_files)
-
+    
+    #@profile
     def __getitem__(self, idx):
         audio_raw = load_audio(self.speech_files[idx],self.sr)
         if self.raw_transform:

@@ -17,7 +17,8 @@ class CharacterLevelTokenizer:
         else:
             encoded=[]
         for i in transcript:
-            encoded.append(self.chars[i])
+            if i in self.chars:
+                encoded.append(self.chars[i])
 
         if add_extras:
             encoded.append(self.end_token)

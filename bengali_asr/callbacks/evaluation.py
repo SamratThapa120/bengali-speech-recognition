@@ -14,6 +14,8 @@ class WhisperAutoregressiveEvaluation:
         self.ignore_token = ignore_token
         self.current_best_wer = 100000
         self.current_best_cer= 100000
+    
+    #@profile
     def __call__(self, epoch):
         total_wer = 0
         total_cer = 0
