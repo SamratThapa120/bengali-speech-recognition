@@ -45,7 +45,7 @@ def load_audio(file: str, sr: int):
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
 
 class SpeechRecognitionDataset(Dataset):
-    def __init__(self,files,transcript,tokenizer,root="",raw_transform=None,mel_transform=None,sampling_rate=16000,token_length=None,pad_token=-1,train=True):
+    def __init__(self,files,transcript,tokenizer,root="",raw_transform=None,mel_transform=None,sampling_rate=16000,token_length=256,pad_token=-1,train=True):
         """
         Args:
             root_dir (str): Directory with all the audio files.
@@ -71,19 +71,28 @@ class SpeechRecognitionDataset(Dataset):
         tensor = self.mel_transform(audio_raw)
         tokens = self.tokenizer(self.transcripts[idx],self.train)
         if not self.train:
-            return torch.from_numpy(tensor),None,tokens
+            pad_len_output = self.token_length - len(tokens)
+            if pad_len_output > 0:
+                tokens = F.pad(tokens, (0, pad_len_output), value=self.pad_token)
+            else:
+                tokens = tokens[:self.token_length]
+            return torch.from_numpy(tensor),torch.tensor([]),tokens
+        
         input_tokens = tokens[:-1]
         output_tokens = tokens[1:]
         
         # Pad input_tokens and output_tokens if they are shorter than self.token_length
-        if self.token_length is not None:
-            pad_len_input = self.token_length - len(input_tokens)
-            pad_len_output = self.token_length - len(output_tokens)
-            if pad_len_input > 0:
-                input_tokens = F.pad(input_tokens, (0, pad_len_input), value=self.tokenizer.end_token)
-            if pad_len_output > 0:
-                output_tokens = F.pad(output_tokens, (0, pad_len_output), value=self.pad_token)
+        pad_len_input = self.token_length - len(input_tokens)
+        pad_len_output = self.token_length - len(output_tokens)
+        if pad_len_input > 0:
+            input_tokens = F.pad(input_tokens, (0, pad_len_input), value=self.tokenizer.end_token)
+        else:
+            input_tokens = input_tokens[:self.token_length]
 
+        if pad_len_output > 0:
+            output_tokens = F.pad(output_tokens, (0, pad_len_output), value=self.pad_token)
+        else:
+            output_tokens = output_tokens[:self.token_length]
 
         return torch.from_numpy(tensor),input_tokens,output_tokens
 

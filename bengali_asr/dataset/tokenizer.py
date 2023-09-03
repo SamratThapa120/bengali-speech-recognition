@@ -22,8 +22,10 @@ class CharacterLevelTokenizer:
         if add_extras:
             encoded.append(self.end_token)
         return torch.tensor(encoded)
+    
     def decode(self,tokens):
         return "".join([self.idx_to_chars[i] for i in tokens])
+    
     def decode_torch_inference(self,tokens):
-        tokens = tokens.detach().cpu()
+        tokens = tokens.detach().cpu().numpy()
         return "".join([self.idx_to_chars[i] for i in tokens])

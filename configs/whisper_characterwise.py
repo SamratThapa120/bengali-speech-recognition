@@ -4,6 +4,7 @@ from bengali_asr.dataset.tokenizer import CharacterLevelTokenizer
 from bengali_asr.dataset.encoder_decoder_dataset import SpeechRecognitionDataset
 from bengali_asr.audio import LogMelSpectrogramTransform
 from bengali_asr.dataset.transforms import ComposeAll
+from bengali_asr.models.loss import MaskedCrossEntropyLoss
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -15,16 +16,16 @@ class Configs(Base):
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
     VALID_DATA_PATH="/app/dataset/valid_data.csv"
     DATA_ROOT="/app/dataset/train_mp3s"
-    USE_DATASET_LEN=200   #Set to small number while debugging
+    USE_DATASET_LEN=None   #Set to small number while debugging
     SAMPLES_PER_GPU=32
-    VALIDATION_BS=1
-    VALIDATION_FREQUENCY=1
+    VALIDATION_BS=32
+    VALIDATION_FREQUENCY=2
     PIN_MEMORY=True
-    NUM_WORKERS=2
+    NUM_WORKERS=4
     DISTRIBUTED=False
 
-    LR=0.001
-    EPOCHS=100
+    LR=0.0005
+    EPOCHS=3
     
     
     VOCAB = ['ও', ' ', 'ব', 'ল', 'ে', 'ছ', 'আ', 'প', 'ন', 'া', 'র', 'ঠ', 'ি', 'ক', '!', 'ো', 'ম', 'হ', 'ষ', '্', 'ট', 'গ', 'ত', 'চ', '?', 'ু', 'ঝ', ',', 'এ', 'স', 'থ', '।', 'শ', 'য', '়', 'ী', 'ধ', 'ঙ', 'ভ', 'জ', 'ই', 'দ', 'খ', 'ফ', 'ং', 'উ', 'ণ', 'অ', 'ঁ', 'ড়', 'য়', 'ঢ', 'ড', '-', 'ূ', 'ঘ', 'ৃ', 'ঞ', '‘', '’', 'ৈ', '"', '—', 'ৌ', 'ৎ', 'ঃ', ';', 'ঐ', 'ঈ', 'ঊ', '–', "'", 'ঋ', ':', '/', 'ঢ়', 'ঔ', '.', '“', '”']
@@ -55,19 +56,20 @@ class Configs(Base):
             LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
             ])
         self.mel_transorm_valid = ComposeAll([
-            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE),
+            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
             ])
         self.train_dataset = SpeechRecognitionDataset(self.training_data.id,
                                                 self.training_data.sentence,
                                                 self.tokenizer,
                                                 self.DATA_ROOT,mel_transform=self.mel_transorm_train,
-                                                sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, train=True)
+                                                sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN)
         
         self.valid_dataset = SpeechRecognitionDataset(self.valid_data.id,
                                                 self.valid_data.sentence,
                                                 self.tokenizer,
-                                                self.DATA_ROOT,mel_transform=self.mel_transorm_valid,sampling_rate=self.SAMPLE_RATE,train=False,pad_token=self.PAD_TOKEN)
+                                                self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
+                                                sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False)
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR)
-        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=len(self.train_dataset)//self.SAMPLES_PER_GPU,epochs=self.EPOCHS)
-        self.criterion = torch.nn.functional.cross_entropy
+        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=len(self.train_dataset)//self.SAMPLES_PER_GPU+1,epochs=self.EPOCHS)
+        self.criterion = MaskedCrossEntropyLoss(self.PAD_TOKEN)

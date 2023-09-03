@@ -1,7 +1,8 @@
 
 import importlib
 import sys
-from .trainer import Trainer
+sys.path.append("../")
+from whisper_trainer import Trainer
 import torch.distributed as dist
 
 if __name__ == "__main__":
