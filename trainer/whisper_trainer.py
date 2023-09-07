@@ -2,7 +2,7 @@ import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
-from utils import setup_logger,MetricsStore
+from .utils import setup_logger,MetricsStore
 import os
 from tqdm import tqdm
 from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
@@ -39,7 +39,9 @@ class Trainer:
         self.model.train()
         total_loss = 0.0
         num_batches = 0
-        for batch in tqdm(self.train_loader,desc=f"Train epoch: {epoch}",disable=self.rank!=0):
+        tqdm_loader = tqdm(self.train_loader,desc=f"Train epoch: {epoch}",disable=self.rank!=0)
+        updatefreq=5
+        for i,batch in enumerate(tqdm_loader):
             # Your training code here
             inputs, inp_tokens,target_tokens = [b.to(self.device) for b in batch]
             
@@ -51,6 +53,8 @@ class Trainer:
             self.scheduler.step()
 
             total_loss += loss.item()
+            if i%updatefreq==0:
+                tqdm_loader.set_description(f"loss: {loss.item():.4f} ")
             num_batches += 1
 
         avg_loss = total_loss / num_batches
@@ -63,13 +67,19 @@ class Trainer:
         self.evaluation_callback(epoch)
 
     def infer(self, inputs):
+        if self.DISTRIBUTED:
+            model = self.model.module
+            
+        else:
+            model = self.model
+        
         batch_size = inputs.size(0)
         generated_tokens = torch.ones((batch_size, 1), dtype=torch.long, device=self.device) * self.START_TOKEN
-        encoded_logits = self.model.encoder(inputs)
+        encoded_logits = model.encoder(inputs)
         eos_flags = torch.zeros(batch_size, dtype=torch.bool, device=self.device)
 
         for _ in range(self.MAX_PREDICTION_LENGTH):
-            logits = self.model.decoder(generated_tokens, encoded_logits)
+            logits = model.decoder(generated_tokens, encoded_logits)
             next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
             generated_tokens = torch.cat([generated_tokens, next_token], dim=1)
 
@@ -81,13 +91,22 @@ class Trainer:
                 break
         return generated_tokens
 
+    def get_state_dict(self):
+        if self.DISTRIBUTED:
+            model = self.model.module.state_dict()  
+        else:
+            model = self.model.state_dict()
+        return model
     
     def train(self):
-        print("Starting training....")
+        if self.rank==0:
+            print("Starting training....")
         for epoch in range(self.EPOCHS):
             if self.DISTRIBUTED:
                 self.train_sampler.set_epoch(epoch)
             self.train_one_epoch(epoch)
             self.validate(epoch)
-            self.logger.info(f"###Epoch: {epoch}  ::  {self.metrics.get_metrics_by_epoch(epoch)}")
-        self.metrics.to_dataframe().to_csv(os.path.join(self.OUTPUTDIR,"metrics.csv"))
+            if self.rank==0:
+                self.logger.info(f"###Epoch: {epoch}  ::  {self.metrics.get_metrics_by_epoch(epoch)}")
+        if self.rank==0:
+            self.metrics.to_dataframe().to_csv(os.path.join(self.OUTPUTDIR,"metrics.csv"))

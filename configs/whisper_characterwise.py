@@ -14,18 +14,19 @@ class Configs(Base):
     OUTPUTDIR="../workdir/whisperbase_characterlevel"
 
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
-    VALID_DATA_PATH="/app/dataset/valid_data.csv"
-    DATA_ROOT="/app/dataset/train_mp3s"
+    VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
+    DATA_ROOT="/app/dataset/train_numpy_16k"
     USE_DATASET_LEN=100   #Set to small number while debugging
     SAMPLES_PER_GPU=32
+    N_GPU=4
     VALIDATION_BS=32
-    VALIDATION_FREQUENCY=2
+    VALIDATION_FREQUENCY=1
     PIN_MEMORY=True
-    NUM_WORKERS=0
-    DISTRIBUTED=False
+    NUM_WORKERS=4
+    DISTRIBUTED=True
 
     LR=0.0005
-    EPOCHS=3
+    EPOCHS=50
     
     
     VOCAB = ['ও', ' ', 'ব', 'ল', 'ে', 'ছ', 'আ', 'প', 'ন', 'া', 'র', 'ঠ', 'ি', 'ক', '!', 'ো', 'ম', 'হ', 'ষ', '্', 'ট', 'গ', 'ত', 'চ', '?', 'ু', 'ঝ', ',', 'এ', 'স', 'থ', '।', 'শ', 'য', '়', 'ী', 'ধ', 'ঙ', 'ভ', 'জ', 'ই', 'দ', 'খ', 'ফ', 'ং', 'উ', 'ণ', 'অ', 'ঁ', 'ড়', 'য়', 'ঢ', 'ড', '-', 'ূ', 'ঘ', 'ৃ', 'ঞ', '‘', '’', 'ৈ', '"', '—', 'ৌ', 'ৎ', 'ঃ', ';', 'ঐ', 'ঈ', 'ঊ', '–', "'", 'ঋ', ':', '/', 'ঢ়', 'ঔ', '.', '“', '”']
@@ -58,18 +59,18 @@ class Configs(Base):
         self.mel_transorm_valid = ComposeAll([
             LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
             ])
-        self.train_dataset = SpeechRecognitionDataset(self.training_data.id,
+        self.train_dataset = SpeechRecognitionDataset(self.training_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.training_data.sentence,
                                                 self.tokenizer,
                                                 self.DATA_ROOT,mel_transform=self.mel_transorm_train,
                                                 sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN)
         
-        self.valid_dataset = SpeechRecognitionDataset(self.valid_data.id,
+        self.valid_dataset = SpeechRecognitionDataset(self.valid_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.valid_data.sentence,
                                                 self.tokenizer,
                                                 self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
                                                 sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False)
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR)
-        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=len(self.train_dataset)//self.SAMPLES_PER_GPU+1,epochs=self.EPOCHS)
+        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1,epochs=self.EPOCHS,pct_start=0.1)
         self.criterion = MaskedCrossEntropyLoss(self.PAD_TOKEN)

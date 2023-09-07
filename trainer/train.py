@@ -3,7 +3,7 @@ import importlib
 import sys
 import os
 sys.path.append("../")
-from whisper_trainer import Trainer
+from trainer.whisper_trainer import Trainer
 import torch.distributed as dist
 
 if __name__ == "__main__":

@@ -243,7 +243,7 @@ class Whisper(nn.Module):
             self.dims.n_text_layer, self.dims.n_text_head, dtype=torch.bool
         )
         all_heads[self.dims.n_text_layer // 2 :] = True
-        self.register_buffer("alignment_heads", all_heads.to_sparse(), persistent=False)
+        self.register_buffer("alignment_heads", all_heads, persistent=False)
 
     def set_alignment_heads(self, dump: bytes):
         array = np.frombuffer(
@@ -252,7 +252,7 @@ class Whisper(nn.Module):
         mask = torch.from_numpy(array).reshape(
             self.dims.n_text_layer, self.dims.n_text_head
         )
-        self.register_buffer("alignment_heads", mask.to_sparse(), persistent=False)
+        self.register_buffer("alignment_heads", mask, persistent=False)
 
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)

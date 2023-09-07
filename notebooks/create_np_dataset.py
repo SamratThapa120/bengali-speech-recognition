@@ -34,7 +34,7 @@ if __name__ == "__main__":
         os.makedirs(output_dir)
 
     # Number of workers (adjust based on your CPU)
-    num_workers = 8
+    num_workers = 16
 
     # Process mp3 files in parallel
     with ProcessPoolExecutor(max_workers=num_workers) as executor:

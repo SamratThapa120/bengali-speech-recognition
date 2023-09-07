@@ -66,7 +66,8 @@ class SpeechRecognitionDataset(Dataset):
     
     #@profile
     def __getitem__(self, idx):
-        audio_raw = load_audio(self.speech_files[idx],self.sr)
+        # audio_raw = load_audio(self.speech_files[idx],self.sr)
+        audio_raw = np.load(self.speech_files[idx])
         if self.raw_transform:
             audio_raw = self.raw_transform(audio_raw)
             
