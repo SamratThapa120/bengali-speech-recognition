@@ -17,6 +17,11 @@ class WhisperAutoregressiveEvaluation:
         self.current_best_cer= 100000
         self.save_ratio = save_ratio
     
+    def _savemodel(self,epoch,path):
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': self.model.get_state_dict(),
+        }, path)
     #@profile
     def __call__(self, epoch):
         total_wer = 0
@@ -58,17 +63,22 @@ class WhisperAutoregressiveEvaluation:
             print("saving best wer model")
             with open(os.path.join(self.model.OUTPUTDIR,"predictions_wer.txt"),"w") as f:
                 for t,p in zip(truths,predictions):
-                    f.write(f"----------------------------------------------------------------------------------------------------")
-                    f.write(f"{t}")
-                    f.write(f"{p}")
-            torch.save(self.model.get_state_dict(),os.path.join(self.model.OUTPUTDIR,"bestmodel_wer.pkl"))
+                    f.write(f"===========================================================================================================================\n")
+                    f.write(f"{t}\n")
+                    f.write(f"---------------------------------------------------------------------------------------------------------------------------\n")
+                    f.write(f"{p}\n")
+            self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"bestmodel_wer.pkl"))
             self.current_best_wer = avg_wer
+
         if avg_cer<=self.current_best_cer:
             print("saving best cer model")
             with open(os.path.join(self.model.OUTPUTDIR,"predictions_cer.txt"),"w") as f:
                 for t,p in zip(truths,predictions):
-                    f.write(f"----------------------------------------------------------------------------------------------------")
-                    f.write(f"{t}")
-                    f.write(f"{p}")
-            torch.save(self.model.get_state_dict(),os.path.join(self.model.OUTPUTDIR,"bestmodel_cer.pkl"))
+                    f.write(f"===========================================================================================================================\n")
+                    f.write(f"Truth: {t}\n")
+                    f.write(f"---------------------------------------------------------------------------------------------------------------------------\n")
+                    f.write(f"Prediction: {p}\n")
+            self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"bestmodel_cer.pkl"))
             self.current_best_cer = avg_cer
+            
+        self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"latest_model.pkl"))

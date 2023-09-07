@@ -16,7 +16,7 @@ class Configs(Base):
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
     VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
     DATA_ROOT="/app/dataset/train_numpy_16k"
-    USE_DATASET_LEN=100   #Set to small number while debugging
+    USE_DATASET_LEN=None   #Set to small number while debugging
     SAMPLES_PER_GPU=32
     N_GPU=4
     VALIDATION_BS=32
@@ -72,5 +72,6 @@ class Configs(Base):
                                                 sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False)
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR)
-        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1,epochs=self.EPOCHS,pct_start=0.1)
+        self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1
+        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.1)
         self.criterion = MaskedCrossEntropyLoss(self.PAD_TOKEN)

@@ -1,4 +1,5 @@
 import torch
+import os
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader, DistributedSampler
@@ -9,6 +10,7 @@ from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
 
 class Trainer:
     def __init__(self, base_obj):
+
         self.__dict__.update(base_obj.get_all_attributes())
 
         if self.DISTRIBUTED:
@@ -23,6 +25,17 @@ class Trainer:
             self.train_sampler = None
             self.model = self.model.to(self.device)
 
+        self.start_epoch = 0
+        if os.path.exists(os.path.join(self.OUTPUTDIR,"latest_model.pkl")):
+            statedict = torch.load(os.path.join(self.OUTPUTDIR,"latest_model.pkl"))
+            self.start_epoch = statedict["epoch"]
+            self.model.load_state_dict(statedict["model_state_dict"])
+            print("loaded model state from epoch: ",self.start_epoch)
+            for _ in range(int(self.steps_per_epoch*self.start_epoch)):
+                self.scheduler.step()
+        else:
+            print("No model checkpoints found")
+            
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
         os.makedirs(self.OUTPUTDIR,exist_ok=True)
@@ -101,7 +114,7 @@ class Trainer:
     def train(self):
         if self.rank==0:
             print("Starting training....")
-        for epoch in range(self.EPOCHS):
+        for epoch in range(self.start_epoch,self.EPOCHS):
             if self.DISTRIBUTED:
                 self.train_sampler.set_epoch(epoch)
             self.train_one_epoch(epoch)
