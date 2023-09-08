@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from .base import Base
-
+import os 
 class Configs(Base):
     OUTPUTDIR="../workdir/whisperbase_characterlevel"
 
@@ -35,12 +35,8 @@ class Configs(Base):
     MAX_PREDICTION_LENGTH=256
     PAD_TOKEN=-1
 
-    def __init__(self):
+    def __init__(self,inference_files=None,inference_text=None):
         self.device = "cuda"
-        self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
-        self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
-
-        print(f"length of train: {len(self.training_data)}, length of valid: {len(self.valid_data)}")
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
                                     n_audio_ctx=self.N_FRAMES//2, 
                                     n_audio_state=512,
@@ -53,12 +49,26 @@ class Configs(Base):
                                     n_text_layer=6)
         self.model = Whisper(self.model_dims)
         self.tokenizer = CharacterLevelTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
-        self.mel_transorm_train = ComposeAll([
-            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
-            ])
         self.mel_transorm_valid = ComposeAll([
             LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
             ])
+        if inference_files is not None:
+            print("inference mode is on")
+            self.inference_dataset = SpeechRecognitionDataset(inference_files,
+                                        inference_text,
+                                        self.tokenizer,
+                                        self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
+                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=False) 
+            return
+        
+        #Below are the 
+        self.mel_transorm_train = ComposeAll([
+            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
+            ])
+        self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
+        self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
+        print(f"length of train: {len(self.training_data)}, length of valid: {len(self.valid_data)}")
+
         self.train_dataset = SpeechRecognitionDataset(self.training_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.training_data.sentence,
                                                 self.tokenizer,
@@ -75,3 +85,8 @@ class Configs(Base):
         self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.1)
         self.criterion = MaskedCrossEntropyLoss(self.PAD_TOKEN)
+
+    def load_state_dict(self,path):
+        statedict = torch.load(path)
+        print("loading model checkpoint from epoch: ",statedict["epoch"])
+        self.model.load_state_dict(statedict["model_state_dict"])

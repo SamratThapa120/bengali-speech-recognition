@@ -64,9 +64,9 @@ class WhisperAutoregressiveEvaluation:
             with open(os.path.join(self.model.OUTPUTDIR,"predictions_wer.txt"),"w") as f:
                 for t,p in zip(truths,predictions):
                     f.write(f"===========================================================================================================================\n")
-                    f.write(f"{t}\n")
+                    f.write(f"Truth: {t}\n")
                     f.write(f"---------------------------------------------------------------------------------------------------------------------------\n")
-                    f.write(f"{p}\n")
+                    f.write(f"Prediction: {p}\n")
             self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"bestmodel_wer.pkl"))
             self.current_best_wer = avg_wer
 

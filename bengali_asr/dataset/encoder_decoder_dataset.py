@@ -46,7 +46,9 @@ def load_audio(file: str, sr: int):
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
 
 class SpeechRecognitionDataset(Dataset):
-    def __init__(self,files,transcript,tokenizer,root="",raw_transform=None,mel_transform=None,sampling_rate=16000,token_length=256,pad_token=-1,train=True):
+    def __init__(self,files,transcript,tokenizer,root="",
+                 raw_transform=None,mel_transform=None,sampling_rate=16000,
+                 token_length=256,pad_token=-1,train=True,usenumpy=True):
         """
         Args:
             root_dir (str): Directory with all the audio files.
@@ -61,13 +63,18 @@ class SpeechRecognitionDataset(Dataset):
         self.token_length = token_length
         self.pad_token = pad_token
         self.train=train
+        self.usenumpy = usenumpy
+        
     def __len__(self):
         return len(self.speech_files)
     
     #@profile
     def __getitem__(self, idx):
-        # audio_raw = load_audio(self.speech_files[idx],self.sr)
-        audio_raw = np.load(self.speech_files[idx])
+        if self.usenumpy:
+            audio_raw = np.load(self.speech_files[idx])
+        else:
+            audio_raw = load_audio(self.speech_files[idx],self.sr)
+
         if self.raw_transform:
             audio_raw = self.raw_transform(audio_raw)
             
