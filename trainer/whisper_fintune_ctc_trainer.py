@@ -7,7 +7,7 @@ from .utils import setup_logger,MetricsStore
 import os
 from tqdm import tqdm
 from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
-
+from contextlib import nullcontext
 class Trainer:
     def __init__(self, base_obj):
 
@@ -27,14 +27,50 @@ class Trainer:
 
         self.start_epoch = 0
         if os.path.exists(os.path.join(self.OUTPUTDIR,"latest_model.pkl")):
+            if self.DISTRIBUTED:
+                model = self.model.module
+            else:
+                model = self.model
             statedict = torch.load(os.path.join(self.OUTPUTDIR,"latest_model.pkl"))
             self.start_epoch = statedict["epoch"]
-            self.model.load_state_dict(statedict["model_state_dict"])
+            model.load_state_dict(statedict["model_state_dict"])
             print("loaded model state from epoch: ",self.start_epoch)
             for _ in range(int(self.steps_per_epoch*self.start_epoch)):
                 self.scheduler.step()
-        else:
-            print("No model checkpoints found")
+        elif hasattr(self,"WHISPER_PATH"):    
+            print("No model checkpoints found,loading whisper checkpoint")
+            checkpoint_state_dict = torch.load(self.WHISPER_PATH)
+
+            if self.DISTRIBUTED:
+                model = self.model.module
+            else:
+                model = self.model
+            # Load only the matching keys and print the ignored ones
+            model_state_dict = model.state_dict()
+            matched_keys = []
+            ignored_keys = []
+            size_mismatch_keys = []
+
+            for name, param in checkpoint_state_dict.items():
+                if name in model_state_dict:
+                    if param.size() == model_state_dict[name].size():
+                        matched_keys.append(name)
+                        model_state_dict[name] = param
+                    else:
+                        size_mismatch_keys.append(name)
+                else:
+                    ignored_keys.append(name)
+
+            model.load_state_dict(model_state_dict, strict=False)
+
+            # Print the ignored keys and size mismatch keys
+            print(f"Ignored keys from the checkpoint:")
+            for key in ignored_keys:
+                print(key)
+
+            print(f"\nKeys with size mismatch:")
+            for key in size_mismatch_keys:
+                print(key)
             
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
@@ -45,8 +81,12 @@ class Trainer:
         if self.rank==0:
             self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
             self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
-       
-
+            print("Autoregressive inference:",self.augoregressive_inference)
+        
+        if self.AUTOCAST:
+            self.train_context = torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=torch.float16)
+        else:
+            self.train_context = nullcontext()
     #@profile
     def train_one_epoch(self,epoch):
         self.model.train()
@@ -56,17 +96,24 @@ class Trainer:
         updatefreq=5
         for i,batch in enumerate(tqdm_loader):
             # Your training code here
-            inputs, inp_tokens,target_tokens = [b.to(self.device) for b in batch]
-            
             self.optimizer.zero_grad()
-            outputs = self.model(inputs,inp_tokens)
-            loss = self.criterion(outputs, target_tokens)
-            loss.backward()
+
+            with self.train_context:
+                inputs, target_tokens = [b.to(self.device) for b in batch]
+                outputs = self.model(inputs,None)
+                loss = self.criterion(outputs, target_tokens)
+            if self.AUTOCAST:
+                self.grad_scaler.scale(loss).backward()
+            else:
+                loss.backward()
             self.optimizer.step()
             self.scheduler.step()
 
             total_loss += loss.item()
             if i%updatefreq==0:
+                if torch.isnan(loss):
+                    print("Found nan loss")
+                    exit()
                 tqdm_loader.set_description(f"loss: {loss.item():.4f} ")
             num_batches += 1
 
@@ -80,30 +127,23 @@ class Trainer:
         self.evaluation_callback(epoch)
 
     def infer(self, inputs):
+        return self._inferonepass(inputs)
+    
+    def _inferonepass(self, inputs):
         if self.DISTRIBUTED:
             model = self.model.module
             
         else:
             model = self.model
         
-        batch_size = inputs.size(0)
-        generated_tokens = torch.ones((batch_size, 1), dtype=torch.long, device=self.device) * self.START_TOKEN
-        encoded_logits = model.encoder(inputs)
-        eos_flags = torch.zeros(batch_size, dtype=torch.bool, device=self.device)
-
-        for _ in range(self.MAX_PREDICTION_LENGTH):
-            logits = model.decoder(generated_tokens, encoded_logits)
-            next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
-            generated_tokens = torch.cat([generated_tokens, next_token], dim=1)
-
-            # Update end-of-sequence flags
-            eos_flags = eos_flags | (next_token.squeeze(-1) == self.END_TOKEN)
-
-            # Stop condition: if all sequences in the batch have generated <eos>
-            if eos_flags.all():
-                break
-        return generated_tokens
-
+        all_indices = torch.argmax(model(inputs).detach().cpu(), dim=-1)
+        generated = []
+        for indices in all_indices:
+            indices = torch.unique_consecutive(indices, dim=-1)
+            indices = indices[indices != self.BLANK_TOKEN]
+            generated.append(indices)
+        return generated
+        
     def get_state_dict(self):
         if self.DISTRIBUTED:
             model = self.model.module.state_dict()  

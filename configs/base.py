@@ -12,7 +12,10 @@ class Base():
     N_SAMPLES_PER_TOKEN = HOP_LENGTH * 2  # the initial convolutions has stride 2
     FRAMES_PER_SECOND = exact_div(SAMPLE_RATE, HOP_LENGTH)  # 10ms per audio frame
     TOKENS_PER_SECOND = exact_div(SAMPLE_RATE, N_SAMPLES_PER_TOKEN)  # 20ms per audio token
+    TRAIN_TYPE=""
+    augoregressive_inference=True
 
+    AUTOCAST=False
     def get_all_attributes(obj):
         attributes = {}
         for key, value in vars(obj.__class__).items():

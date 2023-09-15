@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+import math
 
 
 @dataclass
@@ -21,6 +22,9 @@ class ModelDimensions:
     n_text_state: int
     n_text_head: int
     n_text_layer: int
+    n_max_len: int = 256
+    use_mask: bool = True
+    use_lm: bool = True
 
 
 class LayerNorm(nn.LayerNorm):
@@ -219,6 +223,75 @@ class TextDecoder(nn.Module):
 
         return logits
 
+def positionalencoding1d(d_model, length):
+    """
+    :param d_model: dimension of the model
+    :param length: length of positions
+    :return: length*d_model position matrix
+    """
+    if d_model % 2 != 0:
+        raise ValueError("Cannot use sin/cos positional encoding with "
+                         "odd dim (got dim={:d})".format(d_model))
+    pe = torch.zeros(length, d_model)
+    position = torch.arange(0, length).unsqueeze(1)
+    div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                         -(math.log(10000.0) / d_model)))
+    pe[:, 0::2] = torch.sin(position.float() * div_term)
+    pe[:, 1::2] = torch.cos(position.float() * div_term)
+
+    return pe
+
+class TextDecoderNoLM(nn.Module):
+    def __init__(
+        self, n_vocab: int, n_ctx: int, n_state: int, n_head: int, n_layer: int, max_len:int=256,dropout: float=0.1,use_mask: bool = True
+    ):
+        super().__init__()
+        print("Using ext decoder without language model")
+        
+        # Initialize query embeddings
+        self.query_embeddings = nn.Parameter(torch.randn(max_len, n_state))
+        
+        # Compute and store positional encodings
+        print("Using positional embedding")
+        self.positional_encodings = positionalencoding1d(n_state, max_len)
+        self.register_buffer("pos_enc", self.positional_encodings)
+
+        self.blocks: Iterable[ResidualAttentionBlock] = nn.ModuleList(
+            [
+                ResidualAttentionBlock(n_state, n_head, cross_attention=True)
+                for _ in range(n_layer)
+            ]
+        )
+        self.ln = LayerNorm(n_state)
+        self.dropout = nn.Dropout(p=dropout)
+        self.fc = nn.Linear(n_state,n_vocab)
+
+        if use_mask:
+            mask = torch.empty(n_ctx, n_ctx).fill_(-np.inf).triu_(1)
+            self.register_buffer("mask", mask, persistent=False)
+        else:
+            mask=None
+
+    def forward(self, tokens: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
+        """
+        x : torch.LongTensor, shape = (batch_size, <= n_ctx)
+            the text tokens
+        xa : torch.Tensor, shape = (batch_size, n_mels, n_audio_ctx)
+            the encoded audio features to be attended on
+        """
+        # Add positional encodings to the query embeddings
+        x = self.query_embeddings
+        x = x.unsqueeze(0).expand(xa.size(0), -1, -1)
+        x = x.to(xa.dtype)
+
+        for block in self.blocks:
+            x = block(x+self.pos_enc, xa, mask=self.mask, kv_cache=kv_cache)
+
+        x = self.ln(x)
+        logits = self.fc(self.dropout(x))
+        
+        return logits
+
 
 class Whisper(nn.Module):
     def __init__(self, dims: ModelDimensions):
@@ -231,13 +304,25 @@ class Whisper(nn.Module):
             self.dims.n_audio_head,
             self.dims.n_audio_layer,
         )
-        self.decoder = TextDecoder(
-            self.dims.n_vocab,
-            self.dims.n_text_ctx,
-            self.dims.n_text_state,
-            self.dims.n_text_head,
-            self.dims.n_text_layer,
-        )
+        if self.dims.use_lm:
+           self.decoder = TextDecoder(
+                self.dims.n_vocab,
+                self.dims.n_text_ctx,
+                self.dims.n_text_state,
+                self.dims.n_text_head,
+                self.dims.n_text_layer,
+            )         
+        else:
+           self.decoder = TextDecoderNoLM(
+                self.dims.n_vocab,
+                self.dims.n_text_ctx,
+                self.dims.n_text_state,
+                self.dims.n_text_head,
+                self.dims.n_text_layer,
+                self.dims.n_max_len,
+                use_mask=self.dims.use_mask
+            )   
+
         # use the last half layers for alignment by default; see `set_alignment_heads()` below
         all_heads = torch.zeros(
             self.dims.n_text_layer, self.dims.n_text_head, dtype=torch.bool
@@ -261,7 +346,7 @@ class Whisper(nn.Module):
         return self.decoder(tokens, audio_features)
 
     def forward(
-        self, mel: torch.Tensor, tokens: torch.Tensor
+        self, mel: torch.Tensor, tokens: torch.Tensor=None
     ) -> Dict[str, torch.Tensor]:
         return self.decoder(tokens, self.encoder(mel))
 

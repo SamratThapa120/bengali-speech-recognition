@@ -11,8 +11,8 @@ from torch.utils.data import DataLoader
 from .base import Base
 import os 
 class Configs(Base):
-    OUTPUTDIR="../workdir/whisperbase_characterlevel"
-
+    OUTPUTDIR="../workdir/whisperbase_characterlevel_finetuned"
+    WHISPER_PATH="/app/bengali-speech-recognition/workdir/whisper_checkpoints/base.pkl"
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
     VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
     DATA_ROOT="/app/dataset/train_numpy_16k"
@@ -35,7 +35,7 @@ class Configs(Base):
     MAX_PREDICTION_LENGTH=256
     PAD_TOKEN=-1
 
-    def __init__(self,inference_files=None,inference_text=None,use_numpy=False):
+    def __init__(self,inference_files=None,inference_text=None):
         self.device = "cuda"
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
                                     n_audio_ctx=self.N_FRAMES//2, 
@@ -58,7 +58,7 @@ class Configs(Base):
                                         inference_text,
                                         self.tokenizer,
                                         self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
-                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=use_numpy) 
+                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=False) 
             return
         
         #Below are the 

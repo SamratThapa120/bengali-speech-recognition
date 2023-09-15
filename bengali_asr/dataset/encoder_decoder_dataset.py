@@ -106,3 +106,26 @@ class SpeechRecognitionDataset(Dataset):
 
         return torch.from_numpy(tensor),input_tokens,output_tokens
 
+
+class SpeechRecognitionCTCDataset(SpeechRecognitionDataset):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+
+    def __getitem__(self, idx):
+        if self.usenumpy:
+            audio_raw = np.load(self.speech_files[idx])
+        else:
+            audio_raw = load_audio(self.speech_files[idx],self.sr)
+
+        if self.raw_transform:
+            audio_raw = self.raw_transform(audio_raw)
+            
+        tensor = self.mel_transform(audio_raw)
+        tokens = self.tokenizer(self.transcripts[idx],self.train)
+        
+        pad_len_output = self.token_length - len(tokens)
+        if pad_len_output > 0:
+            tokens = F.pad(tokens, (0, pad_len_output), value=self.pad_token)
+        else:
+            tokens = tokens[:self.token_length]
+        return torch.from_numpy(tensor),tokens

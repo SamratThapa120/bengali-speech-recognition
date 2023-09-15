@@ -11,8 +11,8 @@ from torch.utils.data import DataLoader
 from .base import Base
 import os 
 class Configs(Base):
-    OUTPUTDIR="../workdir/whisperbase_characterlevel"
-
+    OUTPUTDIR="../workdir/whisperbase_characterlevel_finetuned_nolm_posembd"
+    WHISPER_PATH="/app/bengali-speech-recognition/workdir/whisper_checkpoints/base.pkl"
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
     VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
     DATA_ROOT="/app/dataset/train_numpy_16k"
@@ -25,7 +25,7 @@ class Configs(Base):
     NUM_WORKERS=4
     DISTRIBUTED=True
 
-    LR=0.0005
+    LR=0.001
     EPOCHS=50
     
     
@@ -34,8 +34,8 @@ class Configs(Base):
     END_TOKEN=len(VOCAB)+1
     MAX_PREDICTION_LENGTH=256
     PAD_TOKEN=-1
-
-    def __init__(self,inference_files=None,inference_text=None,use_numpy=False):
+    augoregressive_inference=False
+    def __init__(self,inference_files=None,inference_text=None):
         self.device = "cuda"
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
                                     n_audio_ctx=self.N_FRAMES//2, 
@@ -46,7 +46,10 @@ class Configs(Base):
                                     n_text_ctx=448, 
                                     n_text_state=512, 
                                     n_text_head=8, 
-                                    n_text_layer=6)
+                                    n_text_layer=6,
+                                    n_max_len=self.MAX_PREDICTION_LENGTH,
+                                    use_lm=False
+                                    )
         self.model = Whisper(self.model_dims)
         self.tokenizer = CharacterLevelTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
         self.mel_transorm_valid = ComposeAll([
@@ -58,7 +61,7 @@ class Configs(Base):
                                         inference_text,
                                         self.tokenizer,
                                         self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
-                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=use_numpy) 
+                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=False) 
             return
         
         #Below are the 

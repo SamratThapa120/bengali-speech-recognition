@@ -33,19 +33,13 @@ class WhisperAutoregressiveEvaluation:
 
         with torch.no_grad():
             for batch in tqdm(self.valid_loader,desc=f"Valid epoch: {epoch}"):
-                inputs, _, target_tokens = batch
-
+                inputs= batch[0]
+                target_tokens = batch[-1] 
                 # Initialize tokens (assuming <sos> token is 0)
-                generated_tokens = self.model.infer(inputs.to(self.model.device)).detach().cpu()
-
-                generated_tokens = generated_tokens[:, 1:]  # Remove the start token
+                generated_tokens = self.model.infer(inputs.to(self.model.device))
                 for gen,tar in zip(generated_tokens,target_tokens):
-                    end_pos = (gen == self.model.END_TOKEN).nonzero(as_tuple=True)[0]
-                    if len(end_pos) > 0:
-                        gen = gen[:end_pos[0]] 
                     hypothesis = self.tokenizer.decode_torch_inference(gen)
                     reference = self.tokenizer.decode_torch_inference(tar[tar!=self.ignore_token])
-
                     if np.random.rand()<self.save_ratio:
                         predictions.append(hypothesis)
                         truths.append(reference)

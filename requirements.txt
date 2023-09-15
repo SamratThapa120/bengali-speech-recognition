@@ -5,3 +5,4 @@ plotly
 cltk
 bnlp_toolkit==4.0.0
 jiwer==3.0.3
+audiomentations==0.33.0
