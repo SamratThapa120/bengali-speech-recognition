@@ -5,6 +5,8 @@ from bengali_asr.dataset.encoder_decoder_dataset import SpeechRecognitionDataset
 from bengali_asr.audio import LogMelSpectrogramTransform,PadTruncateSpectrogram
 from bengali_asr.dataset.transforms import ComposeAll
 from bengali_asr.models.loss import MaskedCrossEntropyLoss
+from bengali_asr.dataset.mel_augments import FrequencyMasking,TimeMasking
+from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeStretchAug,PitchShiftAug,ResampleAugmentation
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -63,12 +65,19 @@ class Configs(Base):
                                         self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
                                         sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=False) 
             return
-        
-        #Below are the 
+        self.audio_transform_train = ComposeAll([
+            ResampleAugmentation(p=0.5),
+            GaussianNoise(p=0.5),
+            # TimeStretchAug(p=1),
+            # PitchShiftAug(p=1),
+        ])
         self.mel_transorm_train = ComposeAll([
             LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE),
+            FrequencyMasking(prob=0.5),
+            TimeMasking(prob=0.5),
             PadTruncateSpectrogram(tensor_length=self.N_FRAMES)
-            ])
+        ])
+        
         self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
         self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
         print(f"length of train: {len(self.training_data)}, length of valid: {len(self.valid_data)}")
@@ -76,7 +85,7 @@ class Configs(Base):
         self.train_dataset = SpeechRecognitionDataset(self.training_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.training_data.sentence,
                                                 self.tokenizer,
-                                                self.DATA_ROOT,mel_transform=self.mel_transorm_train,
+                                                self.DATA_ROOT, raw_transform=self.audio_transform_train,mel_transform=self.mel_transorm_train,
                                                 sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN)
         
         self.valid_dataset = SpeechRecognitionDataset(self.valid_data.id.apply(lambda x: x.replace(".mp3",".npy")),

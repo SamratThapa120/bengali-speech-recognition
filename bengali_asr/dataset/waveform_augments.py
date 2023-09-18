@@ -43,7 +43,6 @@ class ResampleAugmentation:
     def __call__(self, data):
         if np.random.rand()<self.prob:
             target_sr = np.random.randint(self.min_sr,self.max_sr)*1000
-            print(target_sr)
             downsampled_data = librosa.resample(data, orig_sr=self.orig_sr, target_sr=target_sr)
             return librosa.resample(downsampled_data, orig_sr=target_sr, target_sr=self.orig_sr)
         else:
