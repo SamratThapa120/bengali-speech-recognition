@@ -2,6 +2,7 @@
 import importlib
 import sys
 import os
+import numpy as np
 sys.path.append("../")
 
 from trainer.whisper_fintune_trainer import Trainer

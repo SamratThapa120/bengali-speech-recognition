@@ -14,7 +14,9 @@ class Base():
     TOKENS_PER_SECOND = exact_div(SAMPLE_RATE, N_SAMPLES_PER_TOKEN)  # 20ms per audio token
     TRAIN_TYPE=""
     augoregressive_inference=True
+    NUM_WORKERS_VAL=4
 
+    FREEZE_ENCODER=False
     AUTOCAST=False
     def get_all_attributes(obj):
         attributes = {}

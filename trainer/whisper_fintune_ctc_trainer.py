@@ -18,7 +18,7 @@ class Trainer:
             self.world_size = dist.get_world_size()
             self.device = f"cuda:{self.rank}"
             self.model = self.model.to(self.device)
-            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],)
+            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],find_unused_parameters=True)
             self.train_sampler = DistributedSampler(self.train_dataset, num_replicas=self.world_size, rank=self.rank)
         else:
             self.rank=0
@@ -71,7 +71,12 @@ class Trainer:
             print(f"\nKeys with size mismatch:")
             for key in size_mismatch_keys:
                 print(key)
-            
+        if self.FREEZE_ENCODER:
+            for name, params in self.model.named_parameters():
+                if "encoder" in name:
+                    params.requires_grad = False
+                    params.requires_grad_(False)
+                    
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
         os.makedirs(self.OUTPUTDIR,exist_ok=True)
@@ -79,7 +84,7 @@ class Trainer:
         self.metrics = MetricsStore()
 
         if self.rank==0:
-            self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
+            self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
             self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
             print("Autoregressive inference:",self.augoregressive_inference)
         

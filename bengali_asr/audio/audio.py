@@ -20,7 +20,22 @@ def pad_or_trim(array, length: int , *, axis: int = -1):
 
     return array
 
+class PadTruncateSpectrogram:
+    def __init__(
+        self,
+        tensor_length: int = 3000,
+    ):
+        self.tensor_length = tensor_length
+    def __call__(self, array,axis: int = -1):
+        if array.shape[axis] > self.tensor_length:
+            array = array.take(indices=range(self.tensor_length), axis=axis)
 
+        if array.shape[axis] < self.tensor_length:
+            pad_widths = [(0, 0)] * array.ndim
+            pad_widths[axis] = (0, self.tensor_length - array.shape[axis])
+            array = np.pad(array, pad_widths)
+        return array
+    
 class LogMelSpectrogramTransform:
     def __init__(
         self,

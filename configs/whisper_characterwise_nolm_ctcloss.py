@@ -37,7 +37,7 @@ class Configs(Base):
     TRAIN_TYPE="CTC"
     AUTOCAST=False
     augoregressive_inference=False
-    def __init__(self,inference_files=None,inference_text=None):
+    def __init__(self,inference_files=None,inference_text=None,use_numpy=False):
         self.device = "cuda"
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
                                     n_audio_ctx=self.N_FRAMES//2, 
@@ -63,7 +63,7 @@ class Configs(Base):
                                         inference_text,
                                         self.tokenizer,
                                         self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
-                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=False) 
+                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=use_numpy) 
             return
         
         #Below are the 

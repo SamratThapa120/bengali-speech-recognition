@@ -2,7 +2,7 @@ from bengali_asr.models import ModelDimensions
 from bengali_asr.models import Whisper
 from bengali_asr.dataset.tokenizer import CharacterLevelTokenizer
 from bengali_asr.dataset.encoder_decoder_dataset import SpeechRecognitionDataset
-from bengali_asr.audio import LogMelSpectrogramTransform
+from bengali_asr.audio import LogMelSpectrogramTransform,PadTruncateSpectrogram
 from bengali_asr.dataset.transforms import ComposeAll
 from bengali_asr.models.loss import MaskedCrossEntropyLoss
 import pandas as pd
@@ -52,7 +52,8 @@ class Configs(Base):
         self.model = Whisper(self.model_dims)
         self.tokenizer = CharacterLevelTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
         self.mel_transorm_valid = ComposeAll([
-            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
+            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE),
+            PadTruncateSpectrogram(tensor_length=self.N_FRAMES)
             ])
         if inference_files is not None:
             print("inference mode is on")
@@ -65,7 +66,8 @@ class Configs(Base):
         
         #Below are the 
         self.mel_transorm_train = ComposeAll([
-            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE,tensor_length=self.N_FRAMES),
+            LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE),
+            PadTruncateSpectrogram(tensor_length=self.N_FRAMES)
             ])
         self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
         self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
