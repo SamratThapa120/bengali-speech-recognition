@@ -25,7 +25,7 @@ class Configs(Base):
     NUM_WORKERS=8
     NUM_WORKERS_VAL=4
     DISTRIBUTED=True
-    FREEZE_ENCODER=True
+    FREEZE_ENCODER=False
     TRAIN_TYPE=""
     LR=0.0005
     EPOCHS=50

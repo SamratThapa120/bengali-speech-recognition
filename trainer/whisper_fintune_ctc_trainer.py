@@ -18,7 +18,7 @@ class Trainer:
             self.world_size = dist.get_world_size()
             self.device = f"cuda:{self.rank}"
             self.model = self.model.to(self.device)
-            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],find_unused_parameters=True)
+            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],find_unused_parameters=self.FREEZE_ENCODER)
             self.train_sampler = DistributedSampler(self.train_dataset, num_replicas=self.world_size, rank=self.rank)
         else:
             self.rank=0

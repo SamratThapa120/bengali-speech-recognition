@@ -17,13 +17,16 @@ class GaussianNoise:
         else:
             return data
     
-class TimeStretchAug:
-    def __init__(self, sr=16000,leave_length_unchanged=False,*args,** kwargs):
-        self.sr = sr
-        self.aug = TimeStretch(leave_length_unchanged=leave_length_unchanged,*args,** kwargs)
+class TimeAugment:
+    def __init__(self, range=(0.9,1.1),p=0.5,*args,** kwargs):
+        self.min = range[0]
+        self.range = (range[1]-range[0])
+        self.prob = p
     def __call__(self, data):
-        self.aug.randomize_parameters(data,self.sr)
-        return self.aug.apply(data,self.sr)
+        if np.random.rand()<self.prob:
+            value = self.min+np.random.rand()*self.range
+            return librosa.effects.time_stretch(data,rate=value)
+        return data
 
 class PitchShiftAug:
     def __init__(self, sr=16000,*args,** kwargs):
