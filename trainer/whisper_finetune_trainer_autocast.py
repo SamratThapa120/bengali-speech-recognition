@@ -7,7 +7,7 @@ from .utils import setup_logger,MetricsStore
 import os
 from tqdm import tqdm
 from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
-from contextlib import nullcontext
+
 class Trainer:
     def __init__(self, base_obj):
 
@@ -76,7 +76,6 @@ class Trainer:
                 if "encoder" in name:
                     params.requires_grad = False
                     params.requires_grad_(False)
-                    
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
         os.makedirs(self.OUTPUTDIR,exist_ok=True)
@@ -84,14 +83,11 @@ class Trainer:
         self.metrics = MetricsStore()
 
         if self.rank==0:
-            self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
+            self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
             self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
             print("Autoregressive inference:",self.augoregressive_inference)
-        
-        if self.AUTOCAST:
-            self.train_context = torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=torch.float16)
-        else:
-            self.train_context = nullcontext()
+        self.scaler = torch.cuda.amp.GradScaler()
+
     #@profile
     def train_one_epoch(self,epoch):
         self.model.train()
@@ -102,23 +98,19 @@ class Trainer:
         for i,batch in enumerate(tqdm_loader):
             # Your training code here
             self.optimizer.zero_grad()
-
-            with self.train_context:
-                inputs, target_tokens = [b.to(self.device) for b in batch]
-                outputs = self.model(inputs,None)
+            with torch.autocast(device_type="cuda", dtype=torch.float16):
+                inputs, inp_tokens,target_tokens = [b.to(self.device) for b in batch]
+                outputs = self.model(inputs,inp_tokens)
                 loss = self.criterion(outputs, target_tokens)
-            if self.AUTOCAST:
-                self.grad_scaler.scale(loss).backward()
-            else:
-                loss.backward()
-            self.optimizer.step()
+            # loss.backward()
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            # self.optimizer.step()
             self.scheduler.step()
 
             total_loss += loss.item()
             if i%updatefreq==0:
-                if torch.isnan(loss):
-                    print("Found nan loss")
-                    exit()
                 tqdm_loader.set_description(f"loss: {loss.item():.4f} ")
             num_batches += 1
 
@@ -132,7 +124,10 @@ class Trainer:
         self.evaluation_callback(epoch)
 
     def infer(self, inputs):
-        return self._inferonepass(inputs)
+        if self.augoregressive_inference:
+            return self._inferautoreg(inputs)
+        else:
+            return self._inferonepass(inputs)
     
     def _inferonepass(self, inputs):
         if self.DISTRIBUTED:
@@ -140,15 +135,47 @@ class Trainer:
             
         else:
             model = self.model
+        generated_tokens = torch.argmax(model(inputs).detach().cpu(), dim=-1)
+        gtkns = []
+        generated_tokens = generated_tokens[:, 1:]
+        for gen in generated_tokens:
+            end_pos = (gen == self.END_TOKEN).nonzero(as_tuple=True)[0]
+            if len(end_pos) > 0:
+                gen = gen[:end_pos[0]] 
+            gtkns.append(gen)
+        return generated_tokens
+    def _inferautoreg(self, inputs):
+        if self.DISTRIBUTED:
+            model = self.model.module
+            
+        else:
+            model = self.model
         
-        all_indices = torch.argmax(model(inputs).detach().cpu(), dim=-1)
-        generated = []
-        for indices in all_indices:
-            indices = torch.unique_consecutive(indices, dim=-1)
-            indices = indices[indices != self.BLANK_TOKEN]
-            generated.append(indices)
-        return generated
-        
+        batch_size = inputs.size(0)
+        generated_tokens = torch.ones((batch_size, 1), dtype=torch.long, device=self.device) * self.START_TOKEN
+        encoded_logits = model.encoder(inputs)
+        eos_flags = torch.zeros(batch_size, dtype=torch.bool, device=self.device)
+
+        for _ in range(self.MAX_PREDICTION_LENGTH):
+            logits = model.decoder(generated_tokens, encoded_logits)
+            next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+            generated_tokens = torch.cat([generated_tokens, next_token], dim=1)
+
+            # Update end-of-sequence flags
+            eos_flags = eos_flags | (next_token.squeeze(-1) == self.END_TOKEN)
+
+            # Stop condition: if all sequences in the batch have generated <eos>
+            if eos_flags.all():
+                break
+        gtkns = []
+        generated_tokens = generated_tokens[:, 1:].detach().cpu()
+        for gen in generated_tokens:
+            end_pos = (gen == self.END_TOKEN).nonzero(as_tuple=True)[0]
+            if len(end_pos) > 0:
+                gen = gen[:end_pos[0]] 
+            gtkns.append(gen)
+        return gtkns
+
     def get_state_dict(self):
         if self.DISTRIBUTED:
             model = self.model.module.state_dict()  
@@ -163,9 +190,7 @@ class Trainer:
             if self.DISTRIBUTED:
                 self.train_sampler.set_epoch(epoch)
             self.train_one_epoch(epoch)
-            dist.barrier()
             self.validate(epoch)
-            dist.barrier()
             if self.rank==0:
                 self.logger.info(f"###Epoch: {epoch}  ::  {self.metrics.get_metrics_by_epoch(epoch)}")
         if self.rank==0:

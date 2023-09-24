@@ -9,6 +9,27 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 import math
 
+from transformers import Wav2Vec2Model
+
+class Wav2Vec2Base(torch.nn.Module):
+    def __init__(self, vocab_size,attention_dropout=0.1, hidden_dropout=0.1, feat_proj_dropout = 0.1,
+                    mask_time_prob=0.05,layerdrop=0.1,classifier_dropout=0.1,pretrained="facebook/wav2vec2-xls-r-300m"):
+        super().__init__()
+        if pretrained is not None:
+            self.model = Wav2Vec2Model.from_pretrained(
+                pretrained, 
+                attention_dropout=attention_dropout,
+                hidden_dropout=hidden_dropout,
+                feat_proj_dropout=feat_proj_dropout,
+                mask_time_prob=mask_time_prob,
+                layerdrop=layerdrop)
+        else:
+            raise ValueError("non preteained model is not supported yet")
+        self.dropout = torch.nn.Dropout(p=classifier_dropout)
+        self.classifier = torch.nn.Linear(512,vocab_size)
+
+    def forward(self,inp):
+        return self.classifier(self.dropout(self.model(inp).extract_features))
 
 @dataclass
 class ModelDimensions:

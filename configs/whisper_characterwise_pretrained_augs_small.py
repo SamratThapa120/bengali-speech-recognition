@@ -13,15 +13,15 @@ from torch.utils.data import DataLoader
 from .base import Base
 import os 
 class Configs(Base):
-    OUTPUTDIR="../workdir/whisperbase_characterlevel_finetuned_augmentations"
-    WHISPER_PATH="/app/bengali-speech-recognition/workdir/whisper_checkpoints/base.pkl"
+    OUTPUTDIR="../workdir/whispersmall_characterlevel_finetuned_augmentations"
+    WHISPER_PATH="/app/bengali-speech-recognition/workdir/whisper_checkpoints/small.pkl"
     TRAIN_DATA_PATH="/app/dataset/train_data.csv"
     VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
     DATA_ROOT="/app/dataset/train_numpy_16k"
     USE_DATASET_LEN=None   #Set to small number while debugging
-    SAMPLES_PER_GPU=32
+    SAMPLES_PER_GPU=12
     N_GPU=4
-    VALIDATION_BS=32
+    VALIDATION_BS=12
     VALIDATION_FREQUENCY=1
     PIN_MEMORY=True
     NUM_WORKERS=4
@@ -29,8 +29,8 @@ class Configs(Base):
     DISTRIBUTED=True
     FREEZE_ENCODER=False
     TRAIN_TYPE=""
-    LR=0.00025
-    EPOCHS=50
+    LR=0.0005
+    EPOCHS=10
     augoregressive_inference=True
     
     VOCAB = ['ও', ' ', 'ব', 'ল', 'ে', 'ছ', 'আ', 'প', 'ন', 'া', 'র', 'ঠ', 'ি', 'ক', '!', 'ো', 'ম', 'হ', 'ষ', '্', 'ট', 'গ', 'ত', 'চ', '?', 'ু', 'ঝ', ',', 'এ', 'স', 'থ', '।', 'শ', 'য', '়', 'ী', 'ধ', 'ঙ', 'ভ', 'জ', 'ই', 'দ', 'খ', 'ফ', 'ং', 'উ', 'ণ', 'অ', 'ঁ', 'ড়', 'য়', 'ঢ', 'ড', '-', 'ূ', 'ঘ', 'ৃ', 'ঞ', '‘', '’', 'ৈ', '"', '—', 'ৌ', 'ৎ', 'ঃ', ';', 'ঐ', 'ঈ', 'ঊ', '–', "'", 'ঋ', ':', '/', 'ঢ়', 'ঔ', '.', '“', '”']
@@ -43,14 +43,14 @@ class Configs(Base):
         self.device = "cuda"
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
                                     n_audio_ctx=self.N_FRAMES//2, 
-                                    n_audio_state=512,
-                                    n_audio_head=8, 
-                                    n_audio_layer=6, 
+                                    n_audio_state=768,
+                                    n_audio_head=12,
+                                    n_audio_layer=12,
                                     n_vocab=len(self.VOCAB)+2, 
                                     n_text_ctx=448, 
-                                    n_text_state=512, 
-                                    n_text_head=8, 
-                                    n_text_layer=6)
+                                    n_text_state=768, 
+                                    n_text_head=12, 
+                                    n_text_layer=12)
         self.model = Whisper(self.model_dims)
         self.tokenizer = CharacterLevelTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
         self.mel_transorm_valid = ComposeAll([

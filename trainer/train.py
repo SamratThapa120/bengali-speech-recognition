@@ -4,12 +4,13 @@ import sys
 import os
 import numpy as np
 sys.path.append("../")
-
+import datetime
 from trainer.whisper_fintune_trainer import Trainer
 
 import torch.distributed as dist
 
 if __name__ == "__main__":
+
     if len(sys.argv)==3:
         module_name = sys.argv[2]
     elif len(sys.argv)==2:
@@ -17,7 +18,7 @@ if __name__ == "__main__":
     module = importlib.import_module(f"configs.{module_name}")
     base_obj = module.Configs()
     if base_obj.DISTRIBUTED:
-        dist.init_process_group(backend='nccl')
+        dist.init_process_group(backend='nccl',timeout=datetime.timedelta(seconds=7200000))
     if base_obj.TRAIN_TYPE=="CTC":
         from trainer.whisper_fintune_ctc_trainer import Trainer
     else:

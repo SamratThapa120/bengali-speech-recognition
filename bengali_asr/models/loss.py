@@ -64,9 +64,11 @@ class CTCLossBatchFirst(torch.nn.Module):
         self.ign_index=ignore_index
         self.lossf = torch.nn.CTCLoss(blank=blank,zero_infinity=zero_infinity)
         
-    def forward(self, input_features:torch.Tensor,labels):
+    def forward(self, input_features:torch.Tensor,labels,inplen=None,target_length=None):
         input_features = torch.nn.functional.log_softmax(input_features,dim=2)
         b,s,d = input_features.size()
-        inplen = torch.tensor([s for _ in range(b)]).long().to(input_features.device)
-        target_length = (labels!=self.ign_index).sum(1).long()
-        return self.lossf(torch.transpose(input_features,0,1),labels,inplen,target_length)
+        if inplen is None:
+            inplen = torch.tensor([s for _ in range(b)]).long().to(input_features.device)
+        if target_length is None:
+            target_length = (labels!=self.ign_index).sum(1).long()
+        return self.lossf(input_features.permute(1,0),labels,inplen,target_length)

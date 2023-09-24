@@ -72,19 +72,23 @@ class Trainer:
             for key in size_mismatch_keys:
                 print(key)
         if self.FREEZE_ENCODER:
+            print("freezing encoder layer....")
             for name, params in self.model.named_parameters():
-                if "encoder" in name:
+                if "feature_extractor" in name:
                     params.requires_grad = False
                     params.requires_grad_(False)
-                    
-        self.train_loader = DataLoader(self.train_dataset, batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
+        collate_func=None
+        if hasattr(self,"dataloder_collate"):
+            print("Using collate function..")
+            collate_func= self.dataloder_collate
+        self.train_loader = DataLoader(self.train_dataset,collate_fn=collate_func ,batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
         os.makedirs(self.OUTPUTDIR,exist_ok=True)
         self.logger = setup_logger(os.path.join(self.OUTPUTDIR,"logs.txt"))
         self.metrics = MetricsStore()
 
         if self.rank==0:
-            self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
+            self.valid_loader = DataLoader(self.valid_dataset,collate_fn=collate_func, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
             self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
             print("Autoregressive inference:",self.augoregressive_inference)
         
@@ -104,9 +108,9 @@ class Trainer:
             self.optimizer.zero_grad()
 
             with self.train_context:
-                inputs, target_tokens = [b.to(self.device) for b in batch]
-                outputs = self.model(inputs,None)
-                loss = self.criterion(outputs, target_tokens)
+                inputs, target_tokens ,inplen,targlen= [b.to(self.device) for b in batch]
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, target_tokens,inplen,targlen)
             if self.AUTOCAST:
                 self.grad_scaler.scale(loss).backward()
             else:
