@@ -59,6 +59,7 @@ class SpeechRecognitionCollate:
         audios, tokens_list = zip(*batch)
 
         # Find the max lengths in the batch
+        # max_audio_len = self.max_audio_length
         max_audio_len = min(self.max_audio_length, max([len(audio) for audio in audios]))
         max_token_len = min(self.max_token_length, max([len(tokens) for tokens in tokens_list]))
 
