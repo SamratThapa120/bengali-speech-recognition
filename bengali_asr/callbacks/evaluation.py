@@ -23,7 +23,7 @@ class WhisperAutoregressiveEvaluation:
             'model_state_dict': self.model.get_state_dict(),
         }, path)
     #@profile
-    def __call__(self, epoch):
+    def __call__(self, epoch,target_token_index=-1):
         total_wer = 0
         total_cer = 0
         total_samples = 0
@@ -34,7 +34,7 @@ class WhisperAutoregressiveEvaluation:
         with torch.no_grad():
             for batch in tqdm(self.valid_loader,desc=f"Valid epoch: {epoch}"):
                 inputs= batch[0]
-                target_tokens = batch[-1] 
+                target_tokens = batch[target_token_index] 
                 # Initialize tokens (assuming <sos> token is 0)
                 generated_tokens = self.model.infer(inputs.to(self.model.device))
                 for gen,tar in zip(generated_tokens,target_tokens):

@@ -47,12 +47,13 @@ def load_audio(file: str, sr: int):
 import torch
 
 class SpeechRecognitionCollate:
-    def __init__(self, max_token_length=256, max_audio_length=400000, audio_padding=0.0, token_padding=-1):
+    def __init__(self, max_token_length=256, max_audio_length=400000, audio_padding=0.0, token_padding=-1,audio_scale=320):
         self.max_token_length = max_token_length
         self.max_audio_length = max_audio_length
         self.audio_padding = audio_padding
         self.token_padding = token_padding
-
+        self.audio_scale=audio_scale
+        self.max_audio_encoded_length = (max_audio_length//self.audio_scale)-1
     def __call__(self, batch):
         # Separate the audio and tokens
         audios, tokens_list = zip(*batch)
@@ -76,7 +77,7 @@ class SpeechRecognitionCollate:
             audios_padded[idx, :audio_len] = audio[:audio_len]
             tokens_padded[idx, :token_len] = tokens[:token_len]
 
-            audio_lengths.append(audio_len)
+            audio_lengths.append(min(audio_len//self.audio_scale,self.max_audio_encoded_length))
             token_lengths.append(token_len)
 
         return audios_padded, tokens_padded, torch.tensor(audio_lengths), torch.tensor(token_lengths)

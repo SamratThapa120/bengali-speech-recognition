@@ -16,18 +16,19 @@ class Configs(Base):
     DATA_ROOT="/app/dataset/train_numpy_16k"
     
     USE_DATASET_LEN=None   #Set to small number while debugging
-    SAMPLES_PER_GPU=12
-    N_GPU=1
+    SAMPLES_PER_GPU=10
+    N_GPU=4
+    ENCODER_UNFREEZE_EPOCH=10
+
     VALIDATION_BS=32
     VALIDATION_FREQUENCY=1
     PIN_MEMORY=True
-    NUM_WORKERS=8
+    NUM_WORKERS=4
     NUM_WORKERS_VAL=4
     DISTRIBUTED=True
     FREEZE_ENCODER=True
-    LR=0.003
-    EPOCHS=10
-    ENCODER_UNFREEZE_EPOCH=7
+    LR=0.001
+    EPOCHS=20
 
     
     
@@ -39,10 +40,11 @@ class Configs(Base):
     MAX_AUDIO_LENGTH=400000
     AUDIO_PADDING=0.0
     PAD_TOKEN=-1
-    TRAIN_TYPE="CTC"
+    TRAIN_TYPE="wav2vec_ctc"
     AUTOCAST=False
     augoregressive_inference=False
-
+    
+    AUDIO_SCALE=320
     MAX_FEATURE_LENGTH=400000
     def __init__(self,inference_files=None,inference_text=None,use_numpy=False):
         self.device = "cuda"
@@ -85,7 +87,7 @@ class Configs(Base):
         self.dataloder_collate = SpeechRecognitionCollate(self.MAX_TOKEN_LENGTH,
                                                           self.MAX_AUDIO_LENGTH,
                                                           self.AUDIO_PADDING,
-                                                          self.PAD_TOKEN)
+                                                          self.PAD_TOKEN,self.AUDIO_SCALE)
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR)
         self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.1)

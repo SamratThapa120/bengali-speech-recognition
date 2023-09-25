@@ -19,7 +19,7 @@ class Trainer:
             self.device = f"cuda:{self.rank}"
             self.model = self.model.to(self.device)
             self.model = DistributedDataParallel(self.model, device_ids=[self.rank],find_unused_parameters=self.FREEZE_ENCODER)
-            self.train_sampler = DistributedSampler(self.train_dataset, num_replicas=self.world_size, rank=self.rank)
+            self.train_sampler = DistributedSampler(self.train_dataset, num_replicas=self.world_size, rank=self.rank,shuffle=True)
         else:
             self.rank=0
             self.train_sampler = None
@@ -133,7 +133,7 @@ class Trainer:
         if self.rank != 0 or epoch%self.VALIDATION_FREQUENCY!=0:
             return
         self.model.eval()
-        self.evaluation_callback(epoch)
+        self.evaluation_callback(epoch,target_token_index=1)
 
     def infer(self, inputs):
         return self._inferonepass(inputs)
@@ -163,9 +163,16 @@ class Trainer:
     def train(self):
         if self.rank==0:
             print("Starting training....")
+        
         for epoch in range(self.start_epoch,self.EPOCHS):
             if self.DISTRIBUTED:
                 self.train_sampler.set_epoch(epoch)
+            if epoch>=self.ENCODER_UNFREEZE_EPOCH:
+                print("unfreezing encoder layers....")
+                for _, params in self.model.named_parameters():
+                    params.requires_grad = True
+                    params.requires_grad_(True)
+                dist.barrier()
             self.train_one_epoch(epoch)
             dist.barrier()
             self.validate(epoch)

@@ -67,8 +67,8 @@ class CTCLossBatchFirst(torch.nn.Module):
     def forward(self, input_features:torch.Tensor,labels,inplen=None,target_length=None):
         input_features = torch.nn.functional.log_softmax(input_features,dim=2)
         b,s,d = input_features.size()
-        if inplen is None:
-            inplen = torch.tensor([s for _ in range(b)]).long().to(input_features.device)
+        # if inplen is None: Support for custom input token length not implemented
+        inplen = torch.tensor([s for _ in range(b)]).long().to(input_features.device)
         if target_length is None:
             target_length = (labels!=self.ign_index).sum(1).long()
-        return self.lossf(input_features.permute(1,0),labels,inplen,target_length)
+        return self.lossf(input_features.permute(1,0,2),labels,inplen,target_length)

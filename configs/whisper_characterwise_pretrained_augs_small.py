@@ -29,7 +29,7 @@ class Configs(Base):
     DISTRIBUTED=True
     FREEZE_ENCODER=False
     TRAIN_TYPE=""
-    LR=0.0005
+    LR=0.003
     EPOCHS=10
     augoregressive_inference=True
     
