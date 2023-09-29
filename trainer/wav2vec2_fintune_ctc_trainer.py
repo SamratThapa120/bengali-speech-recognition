@@ -26,16 +26,18 @@ class Trainer:
             self.model = self.model.to(self.device)
 
         self.start_epoch = 0
+        self.current_step=0
         if os.path.exists(os.path.join(self.OUTPUTDIR,"latest_model.pkl")):
             if self.DISTRIBUTED:
                 model = self.model.module
             else:
                 model = self.model
             statedict = torch.load(os.path.join(self.OUTPUTDIR,"latest_model.pkl"))
-            self.start_epoch = statedict["epoch"]
+            self.current_step = statedict["current_step"]
+            self.start_epoch = self.current_step//self.steps_per_epoch
             model.load_state_dict(statedict["model_state_dict"])
-            print("loaded model state from epoch: ",self.start_epoch)
-            for _ in range(int(self.steps_per_epoch*self.start_epoch)):
+            print("loaded model state from step: ",self.current_step)
+            for _ in range(self.current_step):
                 self.scheduler.step()
         elif hasattr(self,"WHISPER_PATH"):    
             print("No model checkpoints found,loading whisper checkpoint")
@@ -89,9 +91,8 @@ class Trainer:
 
         if self.rank==0:
             self.valid_loader = DataLoader(self.valid_dataset,collate_fn=collate_func, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
-            self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
+            self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer_valid,self.PAD_TOKEN)
             print("Autoregressive inference:",self.augoregressive_inference)
-        
         if self.AUTOCAST:
             self.train_context = torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=torch.float16)
         else:
@@ -125,15 +126,21 @@ class Trainer:
                     exit()
                 tqdm_loader.set_description(f"loss: {loss.item():.4f} ")
             num_batches += 1
+            self.current_step+=1
+            if self.current_step%self.VALIDATION_FREQUENCY==0:
+                dist.barrier()
+                if self.rank == 0:
+                    self.validate(self.current_step)
+                    avg_loss = total_loss / num_batches
+                    self.metrics(self.current_step,"training_loss",avg_loss)
+                    self.logger.info(f"###Iter: {self.current_step}  ::  {self.metrics.get_metrics_by_epoch(self.current_step)}")
+                    num_batches=0
+                    total_loss=0.0
+                dist.barrier()
 
-        avg_loss = total_loss / num_batches
-        self.metrics(epoch,"training_loss",avg_loss)
-
-    def validate(self,epoch):
-        if self.rank != 0 or epoch%self.VALIDATION_FREQUENCY!=0:
-            return
+    def validate(self,cs):
         self.model.eval()
-        self.evaluation_callback(epoch,target_token_index=1)
+        self.evaluation_callback(cs,target_token_index=1)
 
     def infer(self, inputs):
         return self._inferonepass(inputs)
@@ -174,10 +181,5 @@ class Trainer:
                     params.requires_grad_(True)
                 dist.barrier()
             self.train_one_epoch(epoch)
-            dist.barrier()
-            self.validate(epoch)
-            dist.barrier()
-            if self.rank==0:
-                self.logger.info(f"###Epoch: {epoch}  ::  {self.metrics.get_metrics_by_epoch(epoch)}")
         if self.rank==0:
             self.metrics.to_dataframe().to_csv(os.path.join(self.OUTPUTDIR,"metrics.csv"))

@@ -17,13 +17,14 @@ class WhisperAutoregressiveEvaluation:
         self.current_best_cer= 100000
         self.save_ratio = save_ratio
     
-    def _savemodel(self,epoch,path):
+    def _savemodel(self,current_step,path):
         torch.save({
-            'epoch': epoch,
+            'current_step': current_step,
             'model_state_dict': self.model.get_state_dict(),
         }, path)
     #@profile
-    def __call__(self, epoch,target_token_index=-1):
+    def __call__(self, current_step,target_token_index=-1):
+        self._savemodel(current_step,os.path.join(self.model.OUTPUTDIR,"latest_model.pkl"))
         total_wer = 0
         total_cer = 0
         total_samples = 0
@@ -32,7 +33,7 @@ class WhisperAutoregressiveEvaluation:
         predictions = []
 
         with torch.no_grad():
-            for batch in tqdm(self.valid_loader,desc=f"Valid epoch: {epoch}"):
+            for batch in tqdm(self.valid_loader,desc=f"Valid step: {current_step}"):
                 inputs= batch[0]
                 target_tokens = batch[target_token_index] 
                 # Initialize tokens (assuming <sos> token is 0)
@@ -50,8 +51,8 @@ class WhisperAutoregressiveEvaluation:
 
         avg_wer = total_wer / total_samples
         avg_cer = total_cer / total_samples
-        self.metrics(epoch,"word_error_rate",avg_wer)
-        self.metrics(epoch,"char_error_rate",avg_cer)
+        self.metrics(current_step,"word_error_rate",avg_wer)
+        self.metrics(current_step,"char_error_rate",avg_cer)
 
         if avg_wer<=self.current_best_wer:
             print("saving best wer model")
@@ -61,7 +62,7 @@ class WhisperAutoregressiveEvaluation:
                     f.write(f"Truth: {t}\n")
                     f.write(f"---------------------------------------------------------------------------------------------------------------------------\n")
                     f.write(f"Prediction: {p}\n")
-            self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"bestmodel_wer.pkl"))
+            self._savemodel(current_step,os.path.join(self.model.OUTPUTDIR,"bestmodel_wer.pkl"))
             self.current_best_wer = avg_wer
 
         if avg_cer<=self.current_best_cer:
@@ -72,7 +73,6 @@ class WhisperAutoregressiveEvaluation:
                     f.write(f"Truth: {t}\n")
                     f.write(f"---------------------------------------------------------------------------------------------------------------------------\n")
                     f.write(f"Prediction: {p}\n")
-            self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"bestmodel_cer.pkl"))
+            self._savemodel(current_step,os.path.join(self.model.OUTPUTDIR,"bestmodel_cer.pkl"))
             self.current_best_cer = avg_cer
             
-        self._savemodel(epoch,os.path.join(self.model.OUTPUTDIR,"latest_model.pkl"))

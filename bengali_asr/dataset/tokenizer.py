@@ -33,7 +33,7 @@ class CharacterLevelTokenizer:
     
 class CharacterLevelCTCTokenizer:
     def __init__(self,characters : list) -> None:
-        characters = sorted(characters)
+        characters = characters
         self.chars = {c:i for i,c in enumerate(characters)}
         self.idx_to_chars = {i:c for i,c in enumerate(characters)}
 

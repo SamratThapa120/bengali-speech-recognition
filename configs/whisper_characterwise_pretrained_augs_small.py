@@ -29,7 +29,7 @@ class Configs(Base):
     DISTRIBUTED=True
     FREEZE_ENCODER=False
     TRAIN_TYPE=""
-    LR=0.003
+    LR=0.0005
     EPOCHS=10
     augoregressive_inference=True
     
@@ -38,7 +38,7 @@ class Configs(Base):
     END_TOKEN=len(VOCAB)+1
     MAX_PREDICTION_LENGTH=256
     PAD_TOKEN=-1
-
+    
     def __init__(self,inference_files=None,inference_text=None):
         self.device = "cuda"
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
@@ -67,7 +67,6 @@ class Configs(Base):
             return
         self.audio_transform_train = ComposeAll([
             ResampleAugmentation(p=0.5),
-            TimeAugment(p=0.5),
             GaussianNoise(p=0.5)
         ])
         self.mel_transorm_train = ComposeAll([
@@ -95,7 +94,7 @@ class Configs(Base):
 
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR)
         self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1
-        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.1)
+        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.2)
         self.criterion = MaskedCrossEntropyLoss(self.PAD_TOKEN)
 
     def load_state_dict(self,path):
