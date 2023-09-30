@@ -6,7 +6,6 @@ from bengali_asr.models.loss import CTCLossBatchFirst
 import pandas as pd
 import torch
 from .base import Base
-from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,ResampleAugmentation
 
 
 class Configs(Base):
@@ -73,7 +72,7 @@ class Configs(Base):
                                         train=False,
                                         usenumpy=use_numpy) 
             return
-        
+        from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,ResampleAugmentation
         #Below are the 
         self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
         self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
