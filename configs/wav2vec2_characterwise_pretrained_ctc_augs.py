@@ -54,7 +54,7 @@ class Configs(Base):
                                 feat_proj_dropout = 0.1,
                                 layerdrop=0.1,
                                 classifier_dropout=0.1,
-                                pretrained="facebook/wav2vec2-xls-r-300m",
+                                pretrained="facebook/wav2vec2-xls-r-300m"  if inference_files is None else None,
                                 activation_dropout=0.0,
                                 mask_time_prob=0.05,
                                 mask_time_length=8)
