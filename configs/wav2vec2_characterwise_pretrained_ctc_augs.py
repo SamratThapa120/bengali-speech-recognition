@@ -48,6 +48,10 @@ class Configs(Base):
     AUDIO_SCALE=320
     def __init__(self,inference_files=None,inference_text=None,use_numpy=False):
         self.device = "cuda"
+        self.dataloder_collate = SpeechRecognitionCollate(self.MAX_TOKEN_LENGTH,
+                                                    self.MAX_AUDIO_LENGTH,
+                                                    self.AUDIO_PADDING,
+                                                    self.PAD_TOKEN,self.AUDIO_SCALE)
         self.model = Wav2Vec2Base(len(self.VOCAB_NOSPECIAL)+1,
                                 attention_dropout=0.1, 
                                 hidden_dropout=0.1, 
@@ -95,10 +99,6 @@ class Configs(Base):
                                                 self.DATA_ROOT,
                                                 sampling_rate=self.SAMPLE_RATE,
                                                 train=False)
-        self.dataloder_collate = SpeechRecognitionCollate(self.MAX_TOKEN_LENGTH,
-                                                          self.MAX_AUDIO_LENGTH,
-                                                          self.AUDIO_PADDING,
-                                                          self.PAD_TOKEN,self.AUDIO_SCALE)
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR)
         self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.2)
