@@ -62,15 +62,15 @@ class Configs(Base):
                                 activation_dropout=0.0,
                                 mask_time_prob=0.05,
                                 mask_time_length=8)
-        self.tokenizer = CharacterLevelCTCTokenizer(self.VOCAB_NOSPECIAL)
-        self.tokenizer_valid = CharacterLevelCTCTokenizer(self.VOCAB)
+        self.tokenizer_train = CharacterLevelCTCTokenizer(self.VOCAB_NOSPECIAL)
+        self.tokenizer = CharacterLevelCTCTokenizer(self.VOCAB)
 
         self.mel_transorm_valid = None
         if inference_files is not None:
             print("inference mode is on")
             self.inference_dataset = SpeechRecognitionCTCDataset(inference_files,
                                         inference_text,
-                                        self.tokenizer_valid,
+                                        self.tokenizer,
                                         self.DATA_ROOT,
                                         sampling_rate=self.SAMPLE_RATE,
                                         train=False,
@@ -88,14 +88,14 @@ class Configs(Base):
         ])
         self.train_dataset = SpeechRecognitionCTCDataset(self.training_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.training_data.sentence,
-                                                self.tokenizer,
+                                                self.tokenizer_train,
                                                 self.DATA_ROOT,
                                                 raw_transform=self.audio_transform_train,
                                                 sampling_rate=self.SAMPLE_RATE)
         
         self.valid_dataset = SpeechRecognitionCTCDataset(self.valid_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.valid_data.sentence,
-                                                self.tokenizer_valid,
+                                                self.tokenizer,
                                                 self.DATA_ROOT,
                                                 sampling_rate=self.SAMPLE_RATE,
                                                 train=False)
