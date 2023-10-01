@@ -132,6 +132,35 @@ class ModelDimensions:
     use_mask: bool = True
     use_lm: bool = True
 
+class Wav2Vec2WithLM(torch.nn.Module):
+    def __init__(self, vocab_size,max_output_len:int=256,decoder_heads:int=8,decoder_layer:int=6,attention_dropout=0.1, hidden_dropout=0.1, feat_proj_dropout = 0.1,
+                    mask_time_prob=0,layerdrop=0,pretrained="facebook/wav2vec2-xls-r-300m",**kwargs):
+        super().__init__()
+        if pretrained is not None:
+            self.model = Wav2Vec2Model.from_pretrained(
+                pretrained, 
+                attention_dropout=attention_dropout,
+                hidden_dropout=hidden_dropout,
+                feat_proj_dropout=feat_proj_dropout,
+                mask_time_prob=mask_time_prob,
+                layerdrop=layerdrop,**kwargs)
+        else:
+            default_configs = default_wav2vec2configs.copy()
+            default_configs.update({
+                "attention_dropout":attention_dropout,
+                "hidden_dropout":hidden_dropout,
+                "feat_proj_dropout":feat_proj_dropout,
+                "mask_time_prob":mask_time_prob,
+                "layerdrop":layerdrop
+            })
+            default_configs.update(kwargs)
+            self.model = Wav2Vec2Model(Wav2Vec2Config(**default_configs))
+        self.decoder = TextDecoder(vocab_size,max_output_len,1024,decoder_heads,decoder_layer)
+
+    def forward(self,audio,tokens):
+        return self.decoder(tokens,self.model(audio).last_hidden_state)
+
+
 
 class LayerNorm(nn.LayerNorm):
     def forward(self, x: Tensor) -> Tensor:

@@ -84,9 +84,45 @@ class SpeechRecognitionCollate:
 
         return audios_padded, tokens_padded, torch.tensor(audio_lengths), torch.tensor(token_lengths)
 
-    # Usage:
-    # collate_fn = SpeechRecognitionCollate(max_token_length=..., max_audio_length=..., audio_padding=..., token_padding=...)
-    # data_loader = torch.utils.data.DataLoader(dataset, batch_size=..., collate_fn=collate_fn)
+class SpeechRecognitionLMCollate:
+    def __init__(self,max_token_length=256,
+                  max_audio_length=163840,
+                  audio_padding=0.0,
+                  token_padding=-1,
+                  inp_token_padding=-1,
+                  audio_scale=320,
+                  ):
+        self.max_token_length = max_token_length
+        self.max_audio_length = max_audio_length
+        self.audio_padding = audio_padding
+        self.token_padding = token_padding
+        self.inp_token_padding = inp_token_padding
+        self.audio_scale=audio_scale
+    def __call__(self, batch):
+        # Separate the audio and tokens
+        audios, tokens_list = zip(*batch)
+
+        # Find the max lengths in the batch
+        # max_audio_len = self.max_audio_length
+        max_audio_len = min(self.max_audio_length, max([len(audio) for audio in audios]))
+        max_token_len = min(self.max_token_length, max([len(tokens) for tokens in tokens_list]))
+
+        # Initialize tensors for padded audios and tokens
+        audios_padded = torch.full((len(audios), max_audio_len), self.audio_padding)
+        inp_tokens_padded = torch.full((len(tokens_list), max_token_len), self.inp_token_padding)
+
+        tokens_padded = torch.full((len(tokens_list), max_token_len), self.token_padding)
+        # Pad the audios and tokens
+        for idx, (audio, tokens) in enumerate(zip(audios, tokens_list)):
+            audio_len = min(len(audio), max_audio_len)
+            token_len = min(len(tokens), max_token_len)
+
+            audios_padded[idx, :audio_len] = audio[:audio_len]
+            inp_tokens_padded[idx, :token_len] = tokens[:token_len]
+            tokens_padded[idx, :token_len] = tokens[:token_len]
+
+        return audios_padded, inp_tokens_padded[:,:-1],tokens_padded[:,1:]
+
 
 class SpeechRecognitionCTCDataset():
     def __init__(self,files,transcript,tokenizer,root="",
