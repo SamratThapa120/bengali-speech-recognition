@@ -133,11 +133,11 @@ class ModelDimensions:
     use_lm: bool = True
 
 class Wav2Vec2WithLM(torch.nn.Module):
-    def __init__(self, vocab_size,max_output_len:int=256,decoder_heads:int=8,decoder_layer:int=6,attention_dropout=0.1, hidden_dropout=0.1, feat_proj_dropout = 0.1,
+    def __init__(self, vocab_size,max_encoder_states,max_output_len:int=256,decoder_heads:int=8,decoder_layer:int=6,attention_dropout=0.1, hidden_dropout=0.1, feat_proj_dropout = 0.1,
                     mask_time_prob=0,layerdrop=0,pretrained="facebook/wav2vec2-xls-r-300m",**kwargs):
         super().__init__()
         if pretrained is not None:
-            self.model = Wav2Vec2Model.from_pretrained(
+            self.encoder = Wav2Vec2Model.from_pretrained(
                 pretrained, 
                 attention_dropout=attention_dropout,
                 hidden_dropout=hidden_dropout,
@@ -154,17 +154,31 @@ class Wav2Vec2WithLM(torch.nn.Module):
                 "layerdrop":layerdrop
             })
             default_configs.update(kwargs)
-            self.model = Wav2Vec2Model(Wav2Vec2Config(**default_configs))
-        self.decoder = TextDecoder(vocab_size,max_output_len,1024,decoder_heads,decoder_layer)
+            self.encoder = Wav2Vec2Model(Wav2Vec2Config(**default_configs))
+        self.decoder = TextDecoder(vocab_size,max_encoder_states,1024,decoder_heads,decoder_layer)
 
     def forward(self,audio,tokens):
-        return self.decoder(tokens,self.model(audio).last_hidden_state)
+        return self.decoder(tokens,self.encoder(audio).last_hidden_state)
 
 
+
+import torch.nn as nn
+from torch import Tensor
 
 class LayerNorm(nn.LayerNorm):
+    
+    def __init__(self, normalized_shape: int, eps: float = 1e-5, elementwise_affine: bool = True):
+        super(LayerNorm, self).__init__(normalized_shape, eps=eps, elementwise_affine=elementwise_affine)
+        self.eps = eps
+    
     def forward(self, x: Tensor) -> Tensor:
-        return super().forward(x.float()).type(x.dtype)
+        # The eps value is already used in the parent class's forward method.
+        # So, there's no need to use it explicitly here.
+        if x.dtype == torch.float16:
+            return super().forward(x.float()).type(x.dtype)
+        else:
+            return super().forward(x)
+
 
 
 class Linear(nn.Linear):
@@ -321,7 +335,7 @@ class TextDecoder(nn.Module):
         super().__init__()
 
         self.token_embedding = nn.Embedding(n_vocab, n_state)
-        self.positional_embedding = nn.Parameter(torch.empty(n_ctx, n_state))
+        self.positional_embedding = nn.Parameter(torch.nn.init.normal_(torch.rand(n_ctx, n_state)))
 
         self.blocks: Iterable[ResidualAttentionBlock] = nn.ModuleList(
             [

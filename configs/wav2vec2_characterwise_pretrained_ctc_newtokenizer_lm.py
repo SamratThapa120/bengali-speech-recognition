@@ -18,7 +18,7 @@ class Configs(Base):
     ENCODER_UNFREEZE_EPOCH=10
 
     VALIDATION_BS=16
-    VALIDATION_FREQUENCY=4000
+    VALIDATION_FREQUENCY=5000
     PIN_MEMORY=True
     NUM_WORKERS=4
     NUM_WORKERS_VAL=4
@@ -28,9 +28,10 @@ class Configs(Base):
     EPOCHS=20
     
     MAX_TOKEN_LENGTH=150
+    MAX_PREDICTION_LENGTH=MAX_TOKEN_LENGTH
     MAX_AUDIO_LENGTH=163840
     AUDIO_PADDING=0.0
-    TRAIN_TYPE="wav2vec_ctc"
+    TRAIN_TYPE="wav2vec_lm"
     AUTOCAST=False
     augoregressive_inference=False
     
@@ -51,6 +52,7 @@ class Configs(Base):
                                             self.END_TOKEN,
                                             self.AUDIO_SCALE)
         self.model = Wav2Vec2WithLM(len(self.VOCAB)+2,
+                                max_encoder_states=self.MAX_AUDIO_LENGTH//self.AUDIO_SCALE+1,
                                 max_output_len=self.MAX_TOKEN_LENGTH,
                                 decoder_heads=8,
                                 decoder_layer=6,

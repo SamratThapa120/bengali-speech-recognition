@@ -154,7 +154,7 @@ class Trainer:
         
         batch_size = inputs.size(0)
         generated_tokens = torch.ones((batch_size, 1), dtype=torch.long, device=self.device) * self.START_TOKEN
-        encoded_logits = model.encoder(inputs)
+        encoded_logits = model.encoder(inputs).last_hidden_state
         eos_flags = torch.zeros(batch_size, dtype=torch.bool, device=self.device)
 
         for _ in range(self.MAX_PREDICTION_LENGTH):

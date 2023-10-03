@@ -22,7 +22,9 @@ if __name__ == "__main__":
     if base_obj.TRAIN_TYPE=="CTC":
         from trainer.whisper_fintune_ctc_trainer import Trainer
     elif base_obj.TRAIN_TYPE=="wav2vec_ctc":
-        from trainer.wav2vec2_fintune_ctc_trainer import Trainer
+        from trainer.wav2vec2_fintune_ctc_trainer import Trainer 
+    elif base_obj.TRAIN_TYPE=="wav2vec_lm":
+        from trainer.wav2vec2_fintune_autoreg_trainer import Trainer
     else:
         from trainer.whisper_fintune_trainer import Trainer
     trainer = Trainer(base_obj)
