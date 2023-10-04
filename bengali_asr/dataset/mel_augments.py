@@ -3,7 +3,7 @@ import numpy as np
 
 
 class FrequencyMasking:
-    def __init__(self, mask_ratio=(0,0.05), num_masks=2,prob=0.2):
+    def __init__(self, mask_ratio=(0,0.025), num_masks=2,prob=0.2):
         self.min_ratio = mask_ratio[0]
         self.max_ratio = mask_ratio[1]
         self.num_masks = num_masks

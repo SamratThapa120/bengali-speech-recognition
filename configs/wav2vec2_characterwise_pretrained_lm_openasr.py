@@ -15,10 +15,10 @@ class Configs(Base):
     USE_DATASET_LEN=None   #Set to small number while debugging
     SAMPLES_PER_GPU=12
     N_GPU=4
-    ENCODER_UNFREEZE_EPOCH=10
+    ENCODER_UNFREEZE_EPOCH=1
 
     VALIDATION_BS=16
-    VALIDATION_FREQUENCY=5000
+    VALIDATION_FREQUENCY=15000
     PIN_MEMORY=True
     NUM_WORKERS=4
     NUM_WORKERS_VAL=4
@@ -62,8 +62,8 @@ class Configs(Base):
                                 layerdrop=0.1,
                                 pretrained="facebook/wav2vec2-xls-r-300m"  if inference_files is None else None,
                                 activation_dropout=0.0,
-                                mask_time_prob=0.075,
-                                mask_time_length=10)
+                                mask_time_prob=0.05,
+                                mask_time_length=8)
         self.tokenizer_train = BengaliTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
         self.tokenizer = BengaliTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
         if inference_files is not None:

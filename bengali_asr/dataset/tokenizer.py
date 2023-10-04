@@ -1,7 +1,7 @@
 import torch
 
 class CharacterLevelTokenizer:
-    def __init__(self,characters : list,start_token=0,end_token=-1) -> None:
+    def __init__(self,characters : list,start_token,end_token) -> None:
         characters = sorted(characters)
         characters.insert(start_token,"<start>")
         characters.insert(end_token,"<end>")
@@ -9,7 +9,7 @@ class CharacterLevelTokenizer:
         self.idx_to_chars = {i:c for i,c in enumerate(characters)}
 
         self.start_token = start_token
-        self.end_token = end_token if end_token!=-1 else len(characters)
+        self.end_token = end_token
 
     def __call__(self,transcript: str,add_extras=True):
         if add_extras:

@@ -312,11 +312,11 @@ class AudioEncoder(nn.Module):
         x = F.gelu(self.conv2(x))
         x = x.permute(0, 2, 1)
 
-        if not self.training:
-            n_ctx_cur = x.shape[1]
-            positional_embedding_cur = self.positional_embedding[:n_ctx_cur, :]
-        else:
-            positional_embedding_cur = self.positional_embedding
+        # if not self.training:
+        n_ctx_cur = x.shape[1]
+        positional_embedding_cur = self.positional_embedding[:n_ctx_cur, :]
+        # else:
+            # positional_embedding_cur = self.positional_embedding
         # assert x.shape[1:] == positional_embedding_cur.shape, "incorrect audio shape"
 
         x = (x + positional_embedding_cur)
