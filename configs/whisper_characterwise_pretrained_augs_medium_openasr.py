@@ -15,12 +15,12 @@ from .base import Base
 import os 
 class Configs(Base):
     OUTPUTDIR="../workdir/whispersmall_characterlevel_finetuned_augmentations_openasr"
-    WHISPER_PATH="/app/bengali-speech-recognition/workdir/whisper_checkpoints/small.pkl"
+    WHISPER_PATH="/app/bengali-speech-recognition/workdir/whisper_checkpoints/medium.pkl"
     TRAIN_DATA_PATH="/app/dataset/train_data_with_openasr_shuffled.csv"
     VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
     DATA_ROOT="/app/dataset/train_numpy_16k"
     USE_DATASET_LEN=None   #Set to small number while debugging
-    SAMPLES_PER_GPU=16
+    SAMPLES_PER_GPU=8
     GRADIENT_STEPS=2
     N_GPU=4
     VALIDATION_BS=12
@@ -58,14 +58,14 @@ class Configs(Base):
                                     self.END_TOKEN)
         self.model_dims = ModelDimensions(n_mels=self.N_MELS, 
                                     n_audio_ctx=self.N_FRAMES//2, 
-                                    n_audio_state=768,
-                                    n_audio_head=12,
-                                    n_audio_layer=12,
+                                    n_audio_state=1024,
+                                    n_audio_head=16,
+                                    n_audio_layer=24,
                                     n_vocab=len(self.VOCAB)+2, 
                                     n_text_ctx=448, 
                                     n_text_state=768, 
-                                    n_text_head=12, 
-                                    n_text_layer=12)
+                                    n_text_head=16, 
+                                    n_text_layer=24)
         self.model = Whisper(self.model_dims)
         self.tokenizer = CharacterLevelTokenizer(self.VOCAB,self.START_TOKEN,self.END_TOKEN)
         self.mel_transorm_valid = ComposeAll([
