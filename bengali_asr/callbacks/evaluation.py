@@ -6,8 +6,8 @@ from tqdm import tqdm
 import os
 import numpy as np
 
-class WhisperAutoregressiveEvaluation:
-    def __init__(self,model,metrics,valid_loader,tokenizer,ignore_token,save_ratio=0.2):
+class ModelValidationCallback:
+    def __init__(self,model,metrics,valid_loader,tokenizer,ignore_token,save_ratio=0.2,save_cer=False):
         self.model = model
         self.metrics = metrics
         self.valid_loader = valid_loader
@@ -16,7 +16,7 @@ class WhisperAutoregressiveEvaluation:
         self.current_best_wer = 100000
         self.current_best_cer= 100000
         self.save_ratio = save_ratio
-    
+        self.save_cer = save_cer
     def _savemodel(self,current_step,path):
         torch.save({
             'current_step': current_step,
@@ -65,7 +65,7 @@ class WhisperAutoregressiveEvaluation:
             self._savemodel(current_step,os.path.join(self.model.OUTPUTDIR,"bestmodel_wer.pkl"))
             self.current_best_wer = avg_wer
 
-        if avg_cer<=self.current_best_cer:
+        if avg_cer<=self.current_best_cer and self.save_cer:
             print("saving best cer model")
             with open(os.path.join(self.model.OUTPUTDIR,"predictions_cer.txt"),"w") as f:
                 for t,p in zip(truths,predictions):

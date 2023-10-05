@@ -6,7 +6,9 @@ from torch.utils.data import DataLoader, DistributedSampler
 from .utils import setup_logger,MetricsStore
 import os
 from tqdm import tqdm
-from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
+from bengali_asr.callbacks.evaluation import ModelValidationCallback
+from bengali_asr.callbacks.examples_test_evaluation import LongFormatExamplesEvaluation
+
 from contextlib import nullcontext
 
 class Trainer:
@@ -91,7 +93,11 @@ class Trainer:
 
         if self.rank==0:
             self.valid_loader = DataLoader(self.valid_dataset,collate_fn=collate_func, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
-            self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
+            self.evaluation_callback = ModelValidationCallback(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
+            if hasattr(self,"ood_dataset"):
+                self.evaluation_callback_ood = LongFormatExamplesEvaluation(self,self.metrics,self.ood_dataset,self.tokenizer,self.PAD_TOKEN,window_size=self.OOD_EVALUATION_WINDOW,overlap=self.OOD_EVALUATION_OVERLAP)
+            else:
+                self.evaluation_callback_ood=None
             print("Autoregressive inference:",self.augoregressive_inference)
         if self.AUTOCAST:
             self.train_context = torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=torch.float16)
@@ -139,11 +145,12 @@ class Trainer:
                     total_loss=0.0
                 dist.barrier()
 
-    def validate(self,epoch):
-        if self.rank != 0 or epoch%self.VALIDATION_FREQUENCY!=0:
+    def validate(self,current_step):
+        if self.rank != 0 or current_step%self.VALIDATION_FREQUENCY!=0:
             return
         self.model.eval()
-        self.evaluation_callback(epoch)
+        self.evaluation_callback(current_step)
+        self.evaluation_callback_ood(current_step)
 
     def infer(self, inputs):
         if self.augoregressive_inference:
@@ -205,6 +212,12 @@ class Trainer:
             model = self.model.state_dict()
         return model
     
+    def _savemodel(self,current_step,path):
+        torch.save({
+            'current_step': current_step,
+            'model_state_dict': self.get_state_dict(),
+        }, path)
+
     def train(self):
         if self.rank==0:
             print("Starting training....")
@@ -212,6 +225,6 @@ class Trainer:
             if self.DISTRIBUTED:
                 self.train_sampler.set_epoch(epoch)
             self.train_one_epoch(epoch)
-
+            self._savemodel(self.current_step,os.path.join(self.OUTPUTDIR,"latest_model.pkl"))
         if self.rank==0:
             self.metrics.to_dataframe().to_csv(os.path.join(self.OUTPUTDIR,"metrics.csv"))

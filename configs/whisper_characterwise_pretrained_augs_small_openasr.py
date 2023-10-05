@@ -47,6 +47,8 @@ class Configs(Base):
     PAD_TOKEN=-1
     AUDIO_PADDING=0.0
     MAX_FRAMES=1700
+    OOD_EVALUATION_WINDOW=1600
+    OOD_EVALUATION_OVERLAP=1
     AUTOCAST=False
     def __init__(self,inference_files=None,inference_text=None):
         self.device = "cuda"
@@ -103,7 +105,13 @@ class Configs(Base):
                                                 self.tokenizer,
                                                 self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
                                                 sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False)
-
+        self.ood_data = pd.read_csv("/app/dataset/metadata/annoated.csv",delimiter="	")
+        self.ood_dataset = SpeechRecognitionDatasetSimplified(self.ood_data.file.apply(lambda x: os.path.join("/app/dataset/examples",x)),
+                                        self.ood_data.sentence,
+                                        self.tokenizer,
+                                        usenumpy=False,
+                                        mel_transform=self.mel_transorm_valid,
+                                        sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False)
         self.optimizer = torch.optim.Adam(self.model.parameters(),lr=self.LR,weight_decay=self.WD)
         self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer,max_lr=self.LR,steps_per_epoch=self.steps_per_epoch,epochs=self.EPOCHS,pct_start=0.1)

@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 from .utils import setup_logger,MetricsStore
 import os
 from tqdm import tqdm
-from bengali_asr.callbacks.evaluation import WhisperAutoregressiveEvaluation
+from bengali_asr.callbacks.evaluation import ModelValidationCallback
 
 class Trainer:
     def __init__(self, base_obj):
@@ -84,7 +84,7 @@ class Trainer:
 
         if self.rank==0:
             self.valid_loader = DataLoader(self.valid_dataset, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
-            self.evaluation_callback = WhisperAutoregressiveEvaluation(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
+            self.evaluation_callback = ModelValidationCallback(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
             print("Autoregressive inference:",self.augoregressive_inference)
         self.scaler = torch.cuda.amp.GradScaler()
 

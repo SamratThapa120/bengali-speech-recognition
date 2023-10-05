@@ -131,6 +131,7 @@ class SpeechRecognitionDatasetSimplified(Dataset):
     
     #@profile
     def __getitem__(self, idx):
+        transcript = self.transcripts[idx]
         if self.usenumpy:
             audio_raw = np.load(self.speech_files[idx])
         else:
@@ -138,9 +139,10 @@ class SpeechRecognitionDatasetSimplified(Dataset):
 
         if self.raw_transform:
             audio_raw = self.raw_transform(audio_raw)
-            
+        if self.concat_transform:
+            audio_raw,transcript = self.concat_transforms(audio_raw,transcript) 
         tensor = self.mel_transform(audio_raw)
-        tokens = self.tokenizer(self.transcripts[idx],self.train)
+        tokens = self.tokenizer(transcript,self.train)
         return torch.from_numpy(tensor),tokens
 
 
