@@ -5,6 +5,29 @@ from audiomentations import AddGaussianNoise, TimeStretch, PitchShift, Shift,Res
 
 # Unused, the quality deteriorates after this transform
         
+class ConcatTransform:
+    def __init__(self, paths,transcripts,max_transcript_length=240,max_concat_len=1,prob=0.5,separator=" "):
+        self.paths = paths
+        self.transcripts = transcripts
+        self.lengths = np.array([len(x) for x in self.transcripts])
+        self.max_concat_len=max_concat_len
+        self.max_transcript_length = max_transcript_length
+        self.separator = separator
+        self.prob = prob
+    def __call__(self, audio,transcripts):
+        if np.random.rand()<self.prob:
+            for _ in range(self.max_concat_len):
+                tlen = len(transcripts)
+                remaining = self.max_transcript_length - tlen
+                valid_idxs=np.where(self.lengths<remaining)[0]
+                if len(valid_idxs)<1:
+                    break
+                idx = np.random.choice(valid_idxs)
+                taudio,tscript = np.load(self.paths[idx]),self.transcripts[idx]
+                transcripts = transcripts + self.separator + tscript
+                audio = np.concatenate([audio,taudio],axis=0)
+        return audio,transcripts
+        
 class GaussianNoise:
     def __init__(self, sr=16000,p=0.5,*args,** kwargs):
         self.sr = sr

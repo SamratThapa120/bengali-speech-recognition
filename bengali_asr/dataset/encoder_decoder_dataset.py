@@ -140,7 +140,7 @@ class SpeechRecognitionDatasetSimplified(Dataset):
         if self.raw_transform:
             audio_raw = self.raw_transform(audio_raw)
         if self.concat_transform:
-            audio_raw,transcript = self.concat_transforms(audio_raw,transcript) 
+            audio_raw,transcript = self.concat_transform(audio_raw,transcript) 
         tensor = self.mel_transform(audio_raw)
         tokens = self.tokenizer(transcript,self.train)
         return torch.from_numpy(tensor),tokens
