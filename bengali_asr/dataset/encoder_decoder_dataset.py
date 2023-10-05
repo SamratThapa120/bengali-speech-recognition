@@ -108,7 +108,7 @@ class SpeechRecognitionDataset(Dataset):
 
 class SpeechRecognitionDatasetSimplified(Dataset):
     def __init__(self,files,transcript,tokenizer,root="",
-                 raw_transform=None,mel_transform=None,sampling_rate=16000,
+                 raw_transform=None,mel_transform=None,concat_transform=None,sampling_rate=16000,
                  token_length=256,pad_token=-1,train=True,usenumpy=True):
         """
         Args:
@@ -125,7 +125,7 @@ class SpeechRecognitionDatasetSimplified(Dataset):
         self.pad_token = pad_token
         self.train=train
         self.usenumpy = usenumpy
-        
+        self.concat_transform=concat_transform
     def __len__(self):
         return len(self.speech_files)
     
