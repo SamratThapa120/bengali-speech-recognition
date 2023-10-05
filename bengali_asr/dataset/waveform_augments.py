@@ -5,6 +5,15 @@ from audiomentations import AddGaussianNoise, TimeStretch, PitchShift, Shift,Res
 
 # Unused, the quality deteriorates after this transform
         
+from transformers import Wav2Vec2Processor
+
+class AudioPreprocessor:
+    def __init__(self,pretrained="facebook/wav2vec2-base-100h",sr=16000):
+        self.processor = Wav2Vec2Processor.from_pretrained(pretrained)
+        self.sr = sr
+    def __call__(self, audio):
+        return self.processor(audio,sr=self.sr)["input_values"][0]
+
 class ConcatTransform:
     def __init__(self, paths,transcripts,max_transcript_length=240,max_concat_len=1,prob=0.5,separator=" "):
         self.paths = paths

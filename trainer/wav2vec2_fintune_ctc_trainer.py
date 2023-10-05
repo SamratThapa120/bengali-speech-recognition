@@ -7,6 +7,7 @@ from .utils import setup_logger,MetricsStore
 import os
 from tqdm import tqdm
 from bengali_asr.callbacks.evaluation import ModelValidationCallback
+from bengali_asr.callbacks.examples_test_evaluation import LongFormatExamplesEvaluation
 from contextlib import nullcontext
 class Trainer:
     def __init__(self, base_obj):
@@ -92,6 +93,10 @@ class Trainer:
         if self.rank==0:
             self.valid_loader = DataLoader(self.valid_dataset,collate_fn=collate_func, batch_size=self.VALIDATION_BS, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS_VAL)
             self.evaluation_callback = ModelValidationCallback(self,self.metrics,self.valid_loader,self.tokenizer,self.PAD_TOKEN)
+            if hasattr(self,"ood_dataset"):
+                self.evaluation_callback_ood = LongFormatExamplesEvaluation(self,self.metrics,self.ood_dataset,self.tokenizer,self.PAD_TOKEN,window_size=self.OOD_EVALUATION_WINDOW,overlap=self.OOD_EVALUATION_OVERLAP,mel=False)
+            else:
+                self.evaluation_callback_ood=None
             print("Autoregressive inference:",self.augoregressive_inference)
         if self.AUTOCAST:
             self.train_context = torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=torch.float16)
@@ -141,7 +146,7 @@ class Trainer:
     def validate(self,cs):
         self.model.eval()
         self.evaluation_callback(cs,target_token_index=1)
-
+        self.evaluation_callback_ood(cs,target_token_index=1)
     def infer(self, inputs):
         return self._inferonepass(inputs)
     

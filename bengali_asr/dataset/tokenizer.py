@@ -32,10 +32,14 @@ class CharacterLevelTokenizer:
         return "".join([self.idx_to_chars[i] for i in tokens])
     
 class CharacterLevelCTCTokenizer:
-    def __init__(self,characters : list) -> None:
+    def __init__(self,characters) -> None:
         characters = characters
-        self.chars = {c:i for i,c in enumerate(characters)}
+        if type(characters)==list:
+            self.chars = {c:i for i,c in enumerate(characters)}
+        else:
+            self.chars = characters
         self.idx_to_chars = {i:c for i,c in enumerate(characters)}
+
 
     def __call__(self,transcript: str,add_extras=True):
         encoded=[]

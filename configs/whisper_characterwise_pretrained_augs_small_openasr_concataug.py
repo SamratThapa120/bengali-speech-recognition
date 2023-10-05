@@ -82,7 +82,7 @@ class Configs(Base):
             return
         from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,PitchShiftAug,ResampleAugmentation,ConcatTransform
         self.audio_transform_train = ComposeAll([
-            GaussianNoise(p=0.2)
+            GaussianNoise(p=0.5)
         ])
         self.mel_transorm_train = ComposeAll([
             LogMelSpectrogramTransform(self.N_MELS,self.N_FFT,self.HOP_LENGTH,self.SAMPLE_RATE),
@@ -110,8 +110,8 @@ class Configs(Base):
                                                 self.DATA_ROOT,mel_transform=self.mel_transorm_valid,
                                                 sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False)
         self.ood_data = pd.read_csv("/app/dataset/metadata/annoated.csv",delimiter="	")
-        self.ood_dataset = SpeechRecognitionDatasetSimplified(self.ood_data.file.apply(lambda x: os.path.join("/app/dataset/examples",x)),
-                                        self.ood_data.sentence,
+        self.ood_dataset = SpeechRecognitionDatasetSimplified(self.ood_data.file.apply(lambda x: os.path.join("/app/dataset/examples",x)).tolist(),
+                                        self.ood_data.sentence.tolist(),
                                         self.tokenizer,
                                         usenumpy=False,
                                         mel_transform=self.mel_transorm_valid,

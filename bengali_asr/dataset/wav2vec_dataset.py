@@ -126,7 +126,7 @@ class SpeechRecognitionLMCollate:
 
 class SpeechRecognitionCTCDataset():
     def __init__(self,files,transcript,tokenizer,root="",
-                    raw_transform=None,sampling_rate=16000,train=True,usenumpy=True):
+                    raw_transform=None,concat_aug=None,sampling_rate=16000,train=True,usenumpy=True):
             """
             Args:
                 root_dir (str): Directory with all the audio files.
@@ -138,12 +138,14 @@ class SpeechRecognitionCTCDataset():
             self.tokenizer = tokenizer
             self.sr = sampling_rate
             self.train=train
+            self.concat_aug = concat_aug
             self.usenumpy = usenumpy
         
     def __len__(self):
         return len(self.speech_files)
 
     def __getitem__(self, idx):
+        tscript = self.transcripts[idx]
         if self.usenumpy:
             audio_raw = np.load(self.speech_files[idx])
         else:
@@ -151,7 +153,9 @@ class SpeechRecognitionCTCDataset():
 
         if self.raw_transform:
             audio_raw = self.raw_transform(audio_raw)
-        
+        if self.concat_aug:
+            audio_raw,tscript = self.concat_aug(audio_raw,tscript)
+            
         audio_raw = torch.tensor(audio_raw)
-        tokens = self.tokenizer(self.transcripts[idx],self.train)
+        tokens = self.tokenizer(tscript,self.train)
         return audio_raw,tokens
