@@ -136,11 +136,10 @@ class SpeechRecognitionDatasetSimplified(Dataset):
             audio_raw = np.load(self.speech_files[idx])
         else:
             audio_raw = load_audio(self.speech_files[idx],self.sr)
-
-        if self.raw_transform:
-            audio_raw = self.raw_transform(audio_raw)
         if self.concat_transform:
             audio_raw,transcript = self.concat_transform(audio_raw,transcript) 
+        if self.raw_transform:
+            audio_raw = self.raw_transform(audio_raw)
         tensor = self.mel_transform(audio_raw)
         tokens = self.tokenizer(transcript,self.train)
         return torch.from_numpy(tensor),tokens
