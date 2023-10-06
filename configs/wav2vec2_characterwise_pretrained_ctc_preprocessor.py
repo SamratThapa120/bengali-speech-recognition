@@ -66,7 +66,11 @@ class Configs(Base):
                                 mask_time_length=10)
         self.tokenizer_train = CharacterLevelCTCTokenizer(self.VOCAB_NOSPECIAL)
         self.tokenizer = CharacterLevelCTCTokenizer(self.VOCAB)
-
+        self.audio_transform_train = ComposeAll(
+            [
+                AudioPreprocessor()   
+            ]
+        )
         self.mel_transorm_valid = None
         if inference_files is not None:
             print("inference mode is on")
@@ -84,11 +88,6 @@ class Configs(Base):
         self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
         self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
         print(f"length of train: {len(self.training_data)}, length of valid: {len(self.valid_data)}")
-        self.audio_transform_train = ComposeAll(
-            [
-                AudioPreprocessor()   
-            ]
-        )
         self.concat_transform_train = ConcatTransform(
             self.training_data.id.apply(lambda x: os.path.join(self.DATA_ROOT,x.replace(".mp3",".npy"))).tolist(),
             self.training_data.sentence.tolist()
