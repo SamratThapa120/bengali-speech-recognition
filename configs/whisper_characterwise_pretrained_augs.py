@@ -6,7 +6,7 @@ from bengali_asr.audio import LogMelSpectrogramTransform,PadTruncateSpectrogram
 from bengali_asr.dataset.transforms import ComposeAll
 from bengali_asr.models.loss import MaskedCrossEntropyLoss
 from bengali_asr.dataset.mel_augments import FrequencyMasking,TimeMasking
-from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,PitchShiftAug,ResampleAugmentation
+from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,PitchShiftAug
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
@@ -66,7 +66,6 @@ class Configs(Base):
                                         sampling_rate=self.SAMPLE_RATE,token_length=self.MAX_PREDICTION_LENGTH, pad_token=self.PAD_TOKEN,train=False,usenumpy=False) 
             return
         self.audio_transform_train = ComposeAll([
-            ResampleAugmentation(p=0.5),
             TimeAugment(p=0.5),
             GaussianNoise(p=0.5)
         ])

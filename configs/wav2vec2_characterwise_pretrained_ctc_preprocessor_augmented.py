@@ -7,9 +7,10 @@ import pandas as pd
 import torch
 from .base import Base
 import os
+import glob
 from bengali_asr.dataset.wav2vec_preprocessor import AudioPreprocessor
 class Configs(Base):
-    OUTPUTDIR="../workdir/wav2vec2_characterlevel_pretrained_ctcloss_prepreocessor"
+    OUTPUTDIR="../workdir/wav2vec2_characterlevel_pretrained_ctcloss_prepreocessor_augmented"
     TRAIN_DATA_PATH="/app/dataset/train_data_with_openasr_shuffled.csv"
     VALID_DATA_PATH="/app/dataset/valid_data_subset.csv"
     DATA_ROOT="/app/dataset/train_numpy_16k"
@@ -66,7 +67,12 @@ class Configs(Base):
                                 mask_time_length=10)
         self.tokenizer_train = CharacterLevelCTCTokenizer(self.VOCAB_NOSPECIAL)
         self.tokenizer = CharacterLevelCTCTokenizer(self.VOCAB)
-
+        self.audio_transform = ComposeAll(
+            [
+                
+                AudioPreprocessor()   
+            ]
+        )
         self.mel_transorm_valid = None
         if inference_files is not None:
             print("inference mode is on")
@@ -74,18 +80,21 @@ class Configs(Base):
                                         inference_text,
                                         self.tokenizer,
                                         self.DATA_ROOT,
-                                        raw_transform=self.audio_transform_train,
+                                        raw_transform=self.audio_transform,
                                         sampling_rate=self.SAMPLE_RATE,
                                         train=False,
                                         usenumpy=use_numpy) 
             return
-        from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,ResampleAugmentation,ConcatTransform
+        from bengali_asr.dataset.waveform_augments import GaussianNoise,TimeAugment,ConcatTransform,AddNaturalNoise
         #Below are the 
         self.training_data = pd.read_csv(self.TRAIN_DATA_PATH)[:self.USE_DATASET_LEN]
         self.valid_data = pd.read_csv(self.VALID_DATA_PATH)[:self.USE_DATASET_LEN]
         print(f"length of train: {len(self.training_data)}, length of valid: {len(self.valid_data)}")
         self.audio_transform_train = ComposeAll(
             [
+                TimeAugment(p=0.5),
+                GaussianNoise(p=0.5),
+                AddNaturalNoise(glob.glob("../../dataset/noise_16k/*.npy"),p=0.75,min_portion=0.5),
                 AudioPreprocessor()   
             ]
         )
@@ -98,15 +107,15 @@ class Configs(Base):
                                                 self.training_data.sentence,
                                                 self.tokenizer_train,
                                                 self.DATA_ROOT,
+                                                concat_aug=self.concat_transform_train,
                                                 raw_transform=self.audio_transform_train,
-
                                                 sampling_rate=self.SAMPLE_RATE)
         
         self.valid_dataset = SpeechRecognitionCTCDataset(self.valid_data.id.apply(lambda x: x.replace(".mp3",".npy")),
                                                 self.valid_data.sentence,
                                                 self.tokenizer,
                                                 self.DATA_ROOT,
-                                                raw_transform=self.audio_transform_train,
+                                                raw_transform=self.audio_transform,
                                                 sampling_rate=self.SAMPLE_RATE,
                                                 train=False)
         self.ood_data = pd.read_csv("/app/dataset/metadata/annoated.csv",delimiter="	")
@@ -114,7 +123,7 @@ class Configs(Base):
                                         self.ood_data.sentence.tolist(),
                                         self.tokenizer,
                                         usenumpy=False,
-                                        raw_transform=self.audio_transform_train,
+                                        raw_transform=self.audio_transform,
                                         sampling_rate=self.SAMPLE_RATE,train=False)
         self.optimizer = torch.optim.AdamW(self.model.parameters(),lr=self.LR,weight_decay=self.WD)
         self.steps_per_epoch = len(self.train_dataset)//(self.SAMPLES_PER_GPU*self.N_GPU)+1

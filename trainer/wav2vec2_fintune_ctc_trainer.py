@@ -146,7 +146,7 @@ class Trainer:
     def validate(self,cs):
         self.model.eval()
         self.evaluation_callback(cs,target_token_index=1)
-        self.evaluation_callback_ood(cs,target_token_index=1)
+        self.evaluation_callback_ood(cs)
     def infer(self, inputs):
         return self._inferonepass(inputs)
     

@@ -150,12 +150,10 @@ class SpeechRecognitionCTCDataset():
             audio_raw = np.load(self.speech_files[idx])
         else:
             audio_raw = load_audio(self.speech_files[idx],self.sr)
-
-        if self.raw_transform:
-            audio_raw = self.raw_transform(audio_raw)
         if self.concat_aug:
             audio_raw,tscript = self.concat_aug(audio_raw,tscript)
-            
+        if self.raw_transform:
+            audio_raw = self.raw_transform(audio_raw)
         audio_raw = torch.tensor(audio_raw)
         tokens = self.tokenizer(tscript,self.train)
         return audio_raw,tokens
