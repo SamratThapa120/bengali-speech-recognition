@@ -10,6 +10,20 @@ from bengali_asr.callbacks.evaluation import ModelValidationCallback
 from bengali_asr.callbacks.examples_test_evaluation import LongFormatExamplesEvaluation
 from contextlib import nullcontext
 class Trainer:
+    def unfreeze(self,epoch):
+        for name, params in self.model.named_parameters():
+            params.requires_grad = True
+            params.requires_grad_(True)
+        if epoch in self.UNFREEZE_EPOCH:
+            unf_name = self.UNFREEZE_NAME[self.UNFREEZE_EPOCH.index(epoch)]
+            print("Freezing parameters before: ",unf_name)
+            freeze= True
+            for name, params in self.model.named_parameters():
+                if unf_name in name:
+                    freeze=False
+                if freeze:
+                    params.requires_grad = False
+                    params.requires_grad_(False)
     def __init__(self, base_obj):
 
         self.__dict__.update(base_obj.get_all_attributes())
@@ -19,7 +33,7 @@ class Trainer:
             self.world_size = dist.get_world_size()
             self.device = f"cuda:{self.rank}"
             self.model = self.model.to(self.device)
-            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],find_unused_parameters=self.FREEZE_ENCODER)
+            self.model = DistributedDataParallel(self.model, device_ids=[self.rank],find_unused_parameters=True)
             self.train_sampler = DistributedSampler(self.train_dataset, num_replicas=self.world_size, rank=self.rank,shuffle=True)
         else:
             self.rank=0
@@ -84,6 +98,10 @@ class Trainer:
         if hasattr(self,"dataloder_collate"):
             print("Using collate function..")
             collate_func= self.dataloder_collate
+        if hasattr(self,"FINETUNING_STRATEGY"):
+            self.finetuning_strategy=self.FINETUNING_STRATEGY
+        else:
+            self.finetuning_strategy = None
         self.train_loader = DataLoader(self.train_dataset,collate_fn=collate_func ,batch_size=self.SAMPLES_PER_GPU, sampler=self.train_sampler, pin_memory=self.PIN_MEMORY, num_workers=self.NUM_WORKERS)
         
         os.makedirs(self.OUTPUTDIR,exist_ok=True)
@@ -179,11 +197,14 @@ class Trainer:
         for epoch in range(self.start_epoch,self.EPOCHS):
             if self.DISTRIBUTED:
                 self.train_sampler.set_epoch(epoch)
-            if epoch>=self.ENCODER_UNFREEZE_EPOCH:
+            if self.FREEZE_ENCODER and  epoch>=self.ENCODER_UNFREEZE_EPOCH:
                 print("unfreezing encoder layers....")
                 for _, params in self.model.named_parameters():
                     params.requires_grad = True
                     params.requires_grad_(True)
+                dist.barrier()
+            if self.finetuning_strategy:
+                self.unfreeze(epoch)
                 dist.barrier()
             self.train_one_epoch(epoch)
         if self.rank==0:

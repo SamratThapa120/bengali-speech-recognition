@@ -103,7 +103,7 @@ class Trainer:
             self.train_context = torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=torch.float16)
         else:
             self.train_context = nullcontext()
-
+        self.accum_steps = self.GRADIENT_STEPS
     #@profile
     def train_one_epoch(self,epoch):
         self.model.train()
@@ -111,21 +111,18 @@ class Trainer:
         num_batches = 0
         tqdm_loader = tqdm(self.train_loader,desc=f"Train epoch: {epoch}",disable=self.rank!=0)
         updatefreq=5
-        for i,batch in enumerate(tqdm_loader):
-            # Your training code here
-            self.optimizer.zero_grad()
 
-            with self.train_context:
+        self.optimizer.zero_grad()
+        for i,batch in enumerate(tqdm_loader):
+            with self.train_context  and torch.set_grad_enabled(True):
                 inputs, inptoken ,targ_token= [b.to(self.device) for b in batch]
                 outputs = self.model(inputs,inptoken)
-                loss = self.criterion(outputs, targ_token)
-            if self.AUTOCAST:
-                self.grad_scaler.scale(loss).backward()
-            else:
+                loss = self.criterion(outputs, targ_token)/self.accum_steps
                 loss.backward()
-            self.optimizer.step()
-            self.scheduler.step()
-
+                if ((i + 1) % self.accum_steps == 0):
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+                self.scheduler.step()
             total_loss += loss.item()
             if i%updatefreq==0:
                 if torch.isnan(loss):
@@ -135,6 +132,7 @@ class Trainer:
             num_batches += 1
             self.current_step+=1
             if self.current_step%self.VALIDATION_FREQUENCY==0:
+                self.optimizer.zero_grad()
                 dist.barrier()
                 if self.rank == 0:
                     self.validate(self.current_step)

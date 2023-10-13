@@ -8,3 +8,4 @@ jiwer==3.0.3
 audiomentations==0.33.0
 transformers==4.33.2
 bnunicodenormalizer==0.1.6
+datasets==2.14.5
